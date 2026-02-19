@@ -420,6 +420,108 @@ class Tower {
                 ctx.fillRect(-8, -10, 8, 20);
                 break;
 
+            case 'bowling':
+                // Black ball with 3 holes
+                ctx.fillStyle = '#0f172a'; // Slate-900
+                ctx.beginPath(); ctx.arc(0, 0, sz / 2, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(-2, -2, 1.5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(2, -2, 1.5, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(0, 2, 1.5, 0, Math.PI * 2); ctx.fill();
+                break;
+
+            case 'dice':
+                // White cube with dots
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(-sz / 2 + 2, -sz / 2 + 2, sz - 4, sz - 4);
+                ctx.fillStyle = '#000';
+                // Draw 5 pattern
+                const dot = 2;
+                ctx.beginPath(); ctx.arc(0, 0, dot, 0, Math.PI * 2); ctx.fill(); // Center
+                ctx.beginPath(); ctx.arc(-6, -6, dot, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(6, -6, dot, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(-6, 6, dot, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(6, 6, dot, 0, Math.PI * 2); ctx.fill();
+                break;
+
+            case 'heart':
+                // Red Heart
+                ctx.fillStyle = '#ef4444';
+                const hsz = sz * 0.4;
+                ctx.beginPath();
+                ctx.moveTo(0, hsz / 2);
+                ctx.bezierCurveTo(0, -hsz / 2, -hsz, -hsz / 2, -hsz, 0);
+                ctx.bezierCurveTo(-hsz, hsz, 0, hsz * 1.5, 0, hsz * 2);
+                ctx.bezierCurveTo(0, hsz * 1.5, hsz, hsz, hsz, 0);
+                ctx.bezierCurveTo(hsz, -hsz / 2, 0, -hsz / 2, 0, hsz / 2);
+                ctx.fill();
+                // Fire effect (simple pulse)
+                if (state.active && Math.random() < 0.3) {
+                    ctx.fillStyle = '#fbbf24';
+                    ctx.beginPath(); ctx.arc((Math.random() - 0.5) * 10, -10, 2, 0, Math.PI * 2); ctx.fill();
+                }
+                break;
+
+            case 'lollipop':
+                // Stick and spiral
+                ctx.fillStyle = '#fce7f3'; // Stick
+                ctx.fillRect(-1, 0, 2, 12);
+                // Candy
+                ctx.fillStyle = '#ec4899'; // Pink
+                ctx.beginPath(); ctx.arc(0, -6, 8, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, -6, 4, 0, Math.PI * 1.5);
+                ctx.stroke();
+                break;
+
+            case 'pacman':
+                // Yellow circle with mouth
+                ctx.fillStyle = '#eab308'; // Yellow-500
+                ctx.beginPath();
+                // Mouth opens/closes based on time or random
+                const mouth = 0.2 + Math.sin(Date.now() / 100) * 0.15;
+                ctx.arc(0, 0, sz / 2, mouth, Math.PI * 2 - mouth);
+                ctx.lineTo(0, 0);
+                ctx.fill();
+                break;
+
+            case 'powerup':
+                // Blue arrow up
+                ctx.fillStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.moveTo(0, -10);
+                ctx.lineTo(8, 0);
+                ctx.lineTo(3, 0);
+                ctx.lineTo(3, 10);
+                ctx.lineTo(-3, 10);
+                ctx.lineTo(-3, 0);
+                ctx.lineTo(-8, 0);
+                ctx.closePath();
+                ctx.fill();
+                break;
+
+            case 'promoted':
+                // Gold chevron/star
+                ctx.fillStyle = '#eab308';
+                ctx.beginPath();
+                ctx.moveTo(0, -10);
+                ctx.lineTo(8, -2);
+                ctx.lineTo(0, -5);
+                ctx.lineTo(-8, -2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.fillStyle = '#ca8a04';
+                ctx.beginPath();
+                ctx.moveTo(0, -4);
+                ctx.lineTo(8, 4);
+                ctx.lineTo(0, 1);
+                ctx.lineTo(-8, 4);
+                ctx.closePath();
+                ctx.fill();
+                break;
+
             default:
                 ctx.fillStyle = '#cbd5e1';
                 ctx.fillRect(-sz / 4, -sz / 4, sz / 2, sz / 2);
@@ -1302,4 +1404,74 @@ window.restart_game = function () {
 window.toggle_pause = function () { state.paused = !state.paused; }
 
 init();
-game_loop();
+// --- TOWER DICTIONARY ---
+window.toggle_dictionary = function () {
+    const el = document.getElementById('tower_dictionary');
+    const is_hidden = el.classList.contains('hidden');
+
+    if (is_hidden) {
+        // Open
+        el.classList.remove('hidden');
+        state.paused = true;
+        render_dict_list();
+    } else {
+        // Close
+        el.classList.add('hidden');
+        state.paused = false;
+    }
+}
+
+function render_dict_list() {
+    const list = document.getElementById('dict_list');
+    list.innerHTML = '';
+
+    Object.keys(TOWERS).forEach(key => {
+        const t = TOWERS[key];
+        const btn = document.createElement('button');
+        btn.className = "aspect-square bg-slate-800 border border-slate-600 rounded hover:bg-slate-700 hover:border-indigo-500 transition flex items-center justify-center p-1 group";
+        btn.onclick = () => show_dict_details(key);
+
+        const img = document.createElement('img');
+        img.src = t.img;
+        img.className = "w-full h-full object-contain opacity-70 group-hover:opacity-100 transition";
+
+        btn.appendChild(img);
+        list.appendChild(btn);
+    });
+}
+
+function show_dict_details(key) {
+    const t = TOWERS[key];
+    const details = document.getElementById('dict_details');
+
+    details.innerHTML = `
+        <div class="relative mb-4">
+            <div class="absolute inset-0 bg-indigo-500 blur-2xl opacity-20"></div>
+            <img src="${t.img}" class="w-24 h-24 object-contain relative z-10 drop-shadow-lg animate-bounce-slow">
+        </div>
+        
+        <h3 class="text-3xl font-black text-white uppercase mb-1">${t.name}</h3>
+        <span class="text-xs font-bold px-2 py-0.5 rounded bg-slate-700 text-indigo-300 border border-indigo-500/30 mb-4 uppercase tracking-widest">${t.type.toUpperCase()}</span>
+        
+        <p class="text-slate-300 text-sm mb-6 max-w-xs leading-relaxed">"${t.desc || 'Sem descrição.'}"</p>
+        
+        <div class="grid grid-cols-2 gap-4 w-full max-w-xs">
+            <div class="bg-slate-800/50 p-2 rounded border border-slate-700">
+                <p class="text-[9px] text-slate-500 uppercase font-bold">Custo</p>
+                <p class="text-yellow-400 font-mono text-xl">$${t.cost}</p>
+            </div>
+            <div class="bg-slate-800/50 p-2 rounded border border-slate-700">
+                <p class="text-[9px] text-slate-500 uppercase font-bold">Dano</p>
+                <p class="text-red-400 font-mono text-xl">${t.dmg > 0 ? (t.dmg > 1000 ? (t.dmg / 1000).toFixed(1) + 'k' : t.dmg) : '-'}</p>
+            </div>
+            <div class="bg-slate-800/50 p-2 rounded border border-slate-700">
+                <p class="text-[9px] text-slate-500 uppercase font-bold">Alcance</p>
+                <p class="text-blue-400 font-mono text-xl">${t.rng > 0 ? t.rng : '-'}</p>
+            </div>
+            <div class="bg-slate-800/50 p-2 rounded border border-slate-700">
+                <p class="text-[9px] text-slate-500 uppercase font-bold">Taxa</p>
+                <p class="text-green-400 font-mono text-xl">${t.rate > 0 ? t.rate : '-'}</p>
+            </div>
+        </div>
+    `;
+}
