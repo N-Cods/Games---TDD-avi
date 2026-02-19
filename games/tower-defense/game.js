@@ -1427,6 +1427,7 @@ function build_tower(gx, gy) {
     window.toggle_pause = function () { state.paused = !state.paused; }
 
     init();
+    game_loop();
     // --- TOWER DICTIONARY ---
     window.toggle_dictionary = function () {
         const el = document.getElementById('tower_dictionary');
