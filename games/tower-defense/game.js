@@ -799,7 +799,21 @@ function handle_input(e) {
     if (state.paused || state.game_over) return;
     const p = get_grid_pos(e);
     if (p.x < 0 || p.x >= COLS || p.y < 0 || p.y >= ROWS) return;
-    const t = state.towers.find(t => t.gx === p.x && t.gy === p.y);
+    // Smart Selection (Cycle Promoted/Host)
+    const towers_here = state.towers.filter(t => t.gx === p.x && t.gy === p.y);
+    let t = towers_here[0];
+
+    if (towers_here.length > 1) {
+        const p_tower = towers_here.find(x => x.type === 'promoted');
+        if (p_tower) {
+            // If already selected Promoted, cycle to Host
+            if (state.selection === p_tower) {
+                t = towers_here.find(x => x !== p_tower);
+            } else {
+                t = p_tower;
+            }
+        }
+    }
     if (t) {
         // Special case for Promoted: Build ON TOP of tower
         if (state.build_type === 'promoted' && t.type !== 'wall' && t.type !== 'mine' && t.type !== 'promoted') {
