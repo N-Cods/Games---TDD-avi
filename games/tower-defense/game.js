@@ -1666,20 +1666,3 @@ function init() {
 // Start
 init();
 game_loop();
-
-document.getElementById('detail_img').src = t.img;
-document.getElementById('detail_name').innerText = t.name;
-document.getElementById('detail_type').innerText = t.type.toUpperCase();
-document.getElementById('detail_desc').textContent = t.desc;
-
-document.getElementById('detail_cost').innerText = '$' + t.cost;
-document.getElementById('detail_dmg').innerText = (t.dmg > 1000 ? (t.dmg / 1000).toFixed(1) + 'k' : t.dmg);
-document.getElementById('detail_rng').innerText = (t.rng || '-');
-document.getElementById('detail_rate').innerText = (t.rate || '-');
-
-modal.classList.remove('hidden');
-}
-
-window.close_tower_detail = function () {
-    document.getElementById('tower_detail_modal').classList.add('hidden');
-}
