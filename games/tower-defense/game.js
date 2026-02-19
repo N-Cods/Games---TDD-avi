@@ -962,14 +962,21 @@ window.open_menu = function (tower, e) {
     // Stats Current
     document.getElementById('stat_dmg').innerText = tower.dmg > 1000 ? (tower.dmg / 1000).toFixed(1) + 'k' : Math.floor(tower.dmg);
     document.getElementById('stat_rng').innerText = tower.range.toFixed(1);
+    document.getElementById('stat_rate').innerText = tower.rate > 0 ? Math.floor(tower.rate) : '-';
 
     // Stats Next (Prediction)
-    const factor = data.upgrade_factor || 1.25;
-    const next_dmg = tower.dmg * factor;
-    const next_rng = tower.range;
+    const f_dmg = data.upg_dmg || 1.25;
+    const f_rng = data.upg_rng || 1.0;
+    const f_rate = data.upg_rate || 1.0;
+
+    const next_dmg = tower.dmg * f_dmg;
+    const next_rng = tower.range * f_rng;
+    let next_rate = tower.rate;
+    if (tower.rate > 0) next_rate = Math.max(2, tower.rate * f_rate);
 
     document.getElementById('stat_dmg_next').innerText = next_dmg > 1000 ? (next_dmg / 1000).toFixed(1) + 'k' : Math.floor(next_dmg);
     document.getElementById('stat_rng_next').innerText = next_rng.toFixed(1);
+    document.getElementById('stat_rate_next').innerText = tower.rate > 0 ? Math.floor(next_rate) : '-';
 
     // Costs
     const cost = Math.floor(data.cost * Math.pow(1.5, tower.lvl - 1));
@@ -977,15 +984,13 @@ window.open_menu = function (tower, e) {
 
     const btn_upgrade = document.getElementById('btn_upgrade');
 
-    if (tower.type === 'mine' || tower.type === 'bowling' || tower.type === 'promoted' || tower.type === 'heart') {
-        if (!data.upgrade_factor) {
-            btn_upgrade.classList.add('hidden');
-            document.getElementById('stat_dmg_next').innerText = '-';
-        } else {
-            btn_upgrade.classList.remove('hidden');
-            document.getElementById('val_upg').innerText = cost;
-            btn_upgrade.onclick = () => { if (state.money >= cost) { state.money -= cost; tower.upgrade(); close_menu(); update_ui(); } };
-        }
+    const non_upgradeable = ['mine', 'bowling', 'promoted', 'heart'];
+
+    if (non_upgradeable.includes(tower.type)) {
+        btn_upgrade.classList.add('hidden');
+        document.getElementById('stat_dmg_next').innerText = '-';
+        document.getElementById('stat_rng_next').innerText = '-';
+        document.getElementById('stat_rate_next').innerText = '-';
     } else {
         btn_upgrade.classList.remove('hidden');
         document.getElementById('val_upg').innerText = cost;
@@ -995,8 +1000,19 @@ window.open_menu = function (tower, e) {
     document.getElementById('val_sell').innerText = sell;
     document.getElementById('btn_sell').onclick = () => {
         state.money += sell;
+
+        // Visual Explosion for Sell
+        create_explosion(tower.gx, tower.gy, 0.5, 'white');
+
         state.grid[tower.gy][tower.gx] = 0;
-        state.towers = state.towers.filter(t => t !== tower);
+
+        // Remove Tower AND any attached Promoted
+        state.towers = state.towers.filter(t => {
+            if (t === tower) return false;
+            if (t.type === 'promoted' && t.host === tower) return false;
+            return true;
+        });
+
         recalc_path();
         close_menu();
         update_ui();
@@ -1005,66 +1021,6 @@ window.open_menu = function (tower, e) {
     menu.classList.remove('hidden');
 }
 
-function open_menu(tower, event) {
-    // if(tower.type === 'mine') return; // REMOVED: Allow selecting mines
-    state.selection = tower;
-    const menu = document.getElementById('upgrade_menu');
-    const data = TOWERS[tower.type];
-
-    document.getElementById('upg_title').innerText = `${data.name} Lv.${tower.lvl}`;
-    document.getElementById('stat_dmg').innerText = Math.floor(tower.dmg);
-    document.getElementById('stat_rng').innerText = tower.range.toFixed(1);
-
-    const cost = Math.floor(data.cost * tower.lvl);
-    const sell = Math.floor(data.cost * 0.5 * tower.lvl);
-
-    // Upgrade Button Logic
-    const btn_upgrade = document.getElementById('btn_upgrade');
-    if (tower.type === 'mine') {
-        btn_upgrade.classList.add('hidden'); // Mines can't upgrade
-    } else {
-        btn_upgrade.classList.remove('hidden');
-        document.getElementById('val_upg').innerText = cost;
-        btn_upgrade.onclick = () => { if (state.money >= cost) { state.money -= cost; tower.upgrade(); close_menu(); update_ui(); } };
-    }
-
-    document.getElementById('val_sell').innerText = sell;
-    document.getElementById('btn_sell').onclick = () => {
-        state.money += sell;
-        state.grid[tower.gy][tower.gx] = 0;
-        state.towers = state.towers.filter(t => t !== tower);
-        recalc_path();
-        close_menu();
-        update_ui();
-    };
-
-    menu.classList.remove('hidden');
-
-    // Posicionamento inteligente (CLAMP dentro do game_area)
-    const rect = canvas.getBoundingClientRect();
-    const menuRect = menu.getBoundingClientRect(); // Need current size or guess
-    const menuW = 150; // Aprox
-    const menuH = 120; // Aprox
-
-    const tx = (tower.gx * TILE_SIZE) + rect.left;
-    const ty = (tower.gy * TILE_SIZE) + rect.top;
-
-    // Default: Right of tower
-    let mx = tx + TILE_SIZE + 10;
-    let my = ty - (menuH / 2) + (TILE_SIZE / 2);
-
-    // Check Right Edge
-    if (mx + menuW > rect.right) {
-        mx = tx - menuW - 10; // Flip to left
-    }
-
-    // Check Top/Bottom Edge
-    if (my < rect.top) my = rect.top + 5;
-    if (my + menuH > rect.bottom) my = rect.bottom - menuH - 5;
-
-    menu.style.left = mx + 'px';
-    menu.style.top = my + 'px';
-}
 
 window.close_menu = function () { document.getElementById('upgrade_menu').classList.add('hidden'); state.selection = null; }
 
@@ -1189,36 +1145,26 @@ function apply_wave_end_effects() {
         }
 
         // PROMOTED: Upgrade host tower
-        if (t.type === 'promoted' && t.host) {
-            t.host.upgrade();
-            create_explosion(t.gx, t.gy, 0.5, '#fbbf24'); // Level Up Effect
+        if (t.type === 'promoted') {
+            // Check if host is valid (exists in active towers)
+            if (!t.host || !state.towers.includes(t.host)) {
+                t.dead = true;
+                return;
+            }
 
-            // Check money for upkeep? "quando o usuário fica sem dinheiro, a torre é eliminada"
-            // Does it consume money? User description: "quando o usuário fica sem dinheiro, a torre é eliminada".
-            // Takes no money? Maybe it means "if money == 0"? Or it COSTS money to upgrade?
-            // "cada onda faz o upgrade... Custo: $600 (to build)". 
-            // Maybe it consumes the upgrade cost? "Promoted... quando o usuário fica sem dinheiro".
-            // I will assume it consumes the UPGRADE COST of the host tower.
-            // If can't pay, Promoted is destroyed.
+            // Calculate Upgrade Cost (Using standard cost formula)
+            const h_data = TOWERS[t.host.type];
+            const cost = Math.floor(h_data.cost * Math.pow(1.5, t.host.lvl - 1));
 
-            // Actually, standard upgrade has no cost variable here, it's formula.
-            // Let's blindly upgrade. But the condition "sem dinheiro" implies consumption.
-            // Let's make it consume $100 per wave? Or nothing?
-            // User: "quando o usuário fica sem dinheiro". This implies it drains money?
-            // I'll make it FREE upgrade, but if Money <= 0 it dies? That's rare.
-            // Let's assume it consumes the upgrade value.
-
-            /* Re-reading: "instala sobre uma torre. cada onda faz o upgrade da torre em 1. quando o usuário fica sem dinheiro, a torre é eliminada."
-               Interpretation: It acts as an auto-upgrader that SPENDS your money.
-            */
-
-            const cost = Math.floor(TOWERS[t.host.type].cost * t.host.lvl);
+            // Logic: Pays for upgrade. If can't pay, destroyed.
             if (state.money >= cost) {
                 state.money -= cost;
-                // upgrade done above
+                t.host.upgrade();
+                create_explosion(t.gx, t.gy, 0.5, '#fbbf24'); // Level Up Effect
             } else {
-                // Can't afford, destroy promoted
+                // Bankrupt - Eliminate Promoted Tower
                 t.dead = true;
+                create_explosion(t.gx, t.gy, 0.5, 'black'); // Death Effect
             }
         }
     });
