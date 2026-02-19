@@ -832,12 +832,6 @@ function build_tower(gx, gy) {
     if (state.build_type === 'bowling') {
         if (state.money < 10) return;
         state.money -= 10;
-        state.towers.push(new BowlingBall(state.spawn.x, state.spawn.y)); // Add to towers list? No, distinct list?
-        // Let's treat it as a "Projectiles" or special entity? 
-        // User description: "atravessa...". It's a projectile.
-        // But for simplicity, let's push to `state.enemies` (hacky) or new `state.balls`.
-        // Let's push to `state.projectiles` with special type 'bowling'.
-        // Actually, let's add `state.balls` array.
         if (!state.balls) state.balls = [];
         state.balls.push(new BowlingBall());
         update_ui();
@@ -849,7 +843,7 @@ function build_tower(gx, gy) {
         // Find tower at pos
         const host = state.towers.find(t => t.gx === gx && t.gy === gy && t.type !== 'promoted' && t.type !== 'mine');
         if (!host) return; // Must be on a tower
-        if (host.type === 'wall') return; // Can't promote wall? Maybe? Let's say no. Use description implies "upgrade". Wall no upgrade.
+        if (host.type === 'wall') return;
 
         const data = TOWERS['promoted'];
         if (state.money < data.cost) return;
@@ -860,148 +854,216 @@ function build_tower(gx, gy) {
         p.host = host; // Link
         state.towers.push(p);
         update_ui();
-        window.open_menu = function (tower, e) {
-            if (state.selection === tower) { close_menu(); return; }
-            state.selection = tower;
-            const menu = document.getElementById('upgrade_menu');
-            const data = TOWERS[tower.type];
-
-            // Title
-            document.getElementById('upg_title').innerText = `${data.name} (LV.${tower.lvl})`;
-
-            // Stats Current
-            document.getElementById('stat_dmg').innerText = tower.dmg > 1000 ? (tower.dmg / 1000).toFixed(1) + 'k' : Math.floor(tower.dmg);
-            document.getElementById('stat_rng').innerText = tower.range.toFixed(1);
-
-            // Stats Next (Prediction)
-            const factor = data.upgrade_factor || 1.25;
-            const next_dmg = tower.dmg * factor;
-            // Range typically doesn't change in upgrade(), so we show current range or '-'
-            // But let's show current range to be clear it stays same, or just same.
-            const next_rng = tower.range;
-
-            document.getElementById('stat_dmg_next').innerText = next_dmg > 1000 ? (next_dmg / 1000).toFixed(1) + 'k' : Math.floor(next_dmg);
-            document.getElementById('stat_rng_next').innerText = next_rng.toFixed(1);
-
-            // Color code updates? 
-            // If next > current, green. Else white.
-
-            // Costs
-            const cost = Math.floor(data.cost * Math.pow(1.5, tower.lvl - 1));
-            const sell = Math.floor(cost * 0.7);
-
-            const btn_upgrade = document.getElementById('btn_upgrade');
-
-            if (tower.type === 'mine' || tower.type === 'bowling' || tower.type === 'powerup' || tower.type === 'promoted' || tower.type === 'heart') {
-                // Towers that might not upgrade traditionally or have undefined stats
-                if (!data.upgrade_factor) {
-                    btn_upgrade.classList.add('hidden');
-                    document.getElementById('stat_dmg_next').innerText = '-';
-                } else {
-                    btn_upgrade.classList.remove('hidden');
-                    document.getElementById('val_upg').innerText = cost;
-                    btn_upgrade.onclick = () => { if (state.money >= cost) { state.money -= cost; tower.upgrade(); close_menu(); update_ui(); } };
-                }
-            } else {
-                btn_upgrade.classList.remove('hidden');
-                document.getElementById('val_upg').innerText = cost;
-                btn_upgrade.onclick = () => { if (state.money >= cost) { state.money -= cost; tower.upgrade(); close_menu(); update_ui(); } };
-            }
-
-            document.getElementById('val_sell').innerText = sell;
-            document.getElementById('btn_sell').onclick = () => {
-                state.money += sell;
-                state.grid[tower.gy][tower.gx] = 0;
-                state.towers = state.towers.filter(t => t !== tower);
-                recalc_path();
-                close_menu();
-                update_ui();
-            };
-
-            menu.classList.remove('hidden');
-            // No manual positioning needed
-        }
-        // Don't need to push tower if we just set grid, but we need Tower object for logic
-        // Wait, state.grid=1 is just blockage. We still need the tower object.
-        state.towers.push(new Tower(gx, gy, state.build_type));
-        update_ui();
+        return;
     }
 
-    function open_menu(tower, event) {
-        // if(tower.type === 'mine') return; // REMOVED: Allow selecting mines
-        state.selection = tower;
-        const menu = document.getElementById('upgrade_menu');
-        const data = TOWERS[tower.type];
+    // NORMAL TOWER LOGIC
+    if (state.grid[gy][gx] === 1) return;
+    if ((gx === state.spawn.x && gy === state.spawn.y) || (gx === state.exit.x && gy === state.exit.y)) return;
+    const data = TOWERS[state.build_type];
+    if (state.money < data.cost) return;
+    const is_mine = data.is_trap;
+    const is_pacman = (state.build_type === 'pacman');
 
-        document.getElementById('upg_title').innerText = `${data.name} Lv.${tower.lvl}`;
-        document.getElementById('stat_dmg').innerText = Math.floor(tower.dmg);
-        document.getElementById('stat_rng').innerText = tower.range.toFixed(1);
+    if (!is_mine && !is_pacman) {
+        state.grid[gy][gx] = 1;
+        recalc_path();
 
-        const cost = Math.floor(data.cost * tower.lvl);
-        const sell = Math.floor(data.cost * 0.5 * tower.lvl);
+        if (state.path_blocked) {
+            state.grid[gy][gx] = 0;
+            recalc_path();
+            return;
+        }
 
-        // Upgrade Button Logic
-        const btn_upgrade = document.getElementById('btn_upgrade');
-        if (tower.type === 'mine') {
-            btn_upgrade.classList.add('hidden'); // Mines can't upgrade
+        let trapped = false;
+        for (let e of state.enemies) {
+            if (!e.flying) {
+                let d = state.flow_field[Math.floor(e.gy)][Math.floor(e.gx)];
+                if (d >= 999) { trapped = true; break; }
+            }
+        }
+
+        if (trapped) {
+            state.grid[gy][gx] = 0;
+            recalc_path();
+            return;
+        }
+    }
+
+    state.money -= data.cost;
+    state.towers.push(new Tower(gx, gy, state.build_type));
+    update_ui();
+}
+
+window.open_menu = function (tower, e) {
+    if (state.selection === tower) { close_menu(); return; }
+    state.selection = tower;
+    const menu = document.getElementById('upgrade_menu');
+    const data = TOWERS[tower.type];
+
+    // Title
+    document.getElementById('upg_title').innerText = `${data.name} (LV.${tower.lvl})`;
+
+    // Stats Current
+    document.getElementById('stat_dmg').innerText = tower.dmg > 1000 ? (tower.dmg / 1000).toFixed(1) + 'k' : Math.floor(tower.dmg);
+    document.getElementById('stat_rng').innerText = tower.range.toFixed(1);
+
+    // Stats Next (Prediction)
+    const factor = data.upgrade_factor || 1.25;
+    const next_dmg = tower.dmg * factor;
+    const next_rng = tower.range;
+
+    document.getElementById('stat_dmg_next').innerText = next_dmg > 1000 ? (next_dmg / 1000).toFixed(1) + 'k' : Math.floor(next_dmg);
+    document.getElementById('stat_rng_next').innerText = next_rng.toFixed(1);
+
+    // Costs
+    const cost = Math.floor(data.cost * Math.pow(1.5, tower.lvl - 1));
+    const sell = Math.floor(cost * 0.7);
+
+    const btn_upgrade = document.getElementById('btn_upgrade');
+
+    if (tower.type === 'mine' || tower.type === 'bowling' || tower.type === 'powerup' || tower.type === 'promoted' || tower.type === 'heart') {
+        if (!data.upgrade_factor) {
+            btn_upgrade.classList.add('hidden');
+            document.getElementById('stat_dmg_next').innerText = '-';
         } else {
             btn_upgrade.classList.remove('hidden');
             document.getElementById('val_upg').innerText = cost;
             btn_upgrade.onclick = () => { if (state.money >= cost) { state.money -= cost; tower.upgrade(); close_menu(); update_ui(); } };
         }
+    } else {
+        btn_upgrade.classList.remove('hidden');
+        document.getElementById('val_upg').innerText = cost;
+        btn_upgrade.onclick = () => { if (state.money >= cost) { state.money -= cost; tower.upgrade(); close_menu(); update_ui(); } };
+    }
 
-        document.getElementById('val_sell').innerText = sell;
-        document.getElementById('btn_sell').onclick = () => {
-            state.money += sell;
-            state.grid[tower.gy][tower.gx] = 0;
-            state.towers = state.towers.filter(t => t !== tower);
-            recalc_path();
-            close_menu();
-            update_ui();
-        };
+    document.getElementById('val_sell').innerText = sell;
+    document.getElementById('btn_sell').onclick = () => {
+        state.money += sell;
+        state.grid[tower.gy][tower.gx] = 0;
+        state.towers = state.towers.filter(t => t !== tower);
+        recalc_path();
+        close_menu();
+        update_ui();
+    };
 
-        menu.classList.remove('hidden');
+    menu.classList.remove('hidden');
+}
 
-        // Posicionamento inteligente (CLAMP dentro do game_area)
-        const rect = canvas.getBoundingClientRect();
-        const menuRect = menu.getBoundingClientRect(); // Need current size or guess
-        const menuW = 150; // Aprox
-        const menuH = 120; // Aprox
+function open_menu(tower, event) {
+    // if(tower.type === 'mine') return; // REMOVED: Allow selecting mines
+    state.selection = tower;
+    const menu = document.getElementById('upgrade_menu');
+    const data = TOWERS[tower.type];
 
-        const tx = (tower.gx * TILE_SIZE) + rect.left;
-        const ty = (tower.gy * TILE_SIZE) + rect.top;
+    document.getElementById('upg_title').innerText = `${data.name} Lv.${tower.lvl}`;
+    document.getElementById('stat_dmg').innerText = Math.floor(tower.dmg);
+    document.getElementById('stat_rng').innerText = tower.range.toFixed(1);
 
-        // Default: Right of tower
-        let mx = tx + TILE_SIZE + 10;
-        let my = ty - (menuH / 2) + (TILE_SIZE / 2);
+    const cost = Math.floor(data.cost * tower.lvl);
+    const sell = Math.floor(data.cost * 0.5 * tower.lvl);
 
-        // Check Right Edge
-        if (mx + menuW > rect.right) {
-            mx = tx - menuW - 10; // Flip to left
+    // Upgrade Button Logic
+    const btn_upgrade = document.getElementById('btn_upgrade');
+    if (tower.type === 'mine') {
+        btn_upgrade.classList.add('hidden'); // Mines can't upgrade
+    } else {
+        btn_upgrade.classList.remove('hidden');
+        document.getElementById('val_upg').innerText = cost;
+        btn_upgrade.onclick = () => { if (state.money >= cost) { state.money -= cost; tower.upgrade(); close_menu(); update_ui(); } };
+    }
+
+    document.getElementById('val_sell').innerText = sell;
+    document.getElementById('btn_sell').onclick = () => {
+        state.money += sell;
+        state.grid[tower.gy][tower.gx] = 0;
+        state.towers = state.towers.filter(t => t !== tower);
+        recalc_path();
+        close_menu();
+        update_ui();
+    };
+
+    menu.classList.remove('hidden');
+
+    // Posicionamento inteligente (CLAMP dentro do game_area)
+    const rect = canvas.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect(); // Need current size or guess
+    const menuW = 150; // Aprox
+    const menuH = 120; // Aprox
+
+    const tx = (tower.gx * TILE_SIZE) + rect.left;
+    const ty = (tower.gy * TILE_SIZE) + rect.top;
+
+    // Default: Right of tower
+    let mx = tx + TILE_SIZE + 10;
+    let my = ty - (menuH / 2) + (TILE_SIZE / 2);
+
+    // Check Right Edge
+    if (mx + menuW > rect.right) {
+        mx = tx - menuW - 10; // Flip to left
+    }
+
+    // Check Top/Bottom Edge
+    if (my < rect.top) my = rect.top + 5;
+    if (my + menuH > rect.bottom) my = rect.bottom - menuH - 5;
+
+    menu.style.left = mx + 'px';
+    menu.style.top = my + 'px';
+}
+
+window.close_menu = function () { document.getElementById('upgrade_menu').classList.add('hidden'); state.selection = null; }
+
+// --- GAME LOOP ---
+
+window.start_wave = function () {
+    if (state.active || state.game_over || state.spawning) return;
+    state.active = true;
+    state.spawning = true;
+    state.spawn_max = 20 + Math.floor(state.wave * 1.3);
+    state.spawn_count = 0;
+    state.spawn_timer = 0;
+    state.spawn_delay = Math.floor(60 - Math.min(50, state.wave * 1.5)); // In frames (~1s down to ~0.16s)
+}
+
+// Spawn Logic
+if (state.spawning) {
+    if (state.spawn_timer <= 0) {
+        // Air units only after Wave 10
+        let fly = (state.wave >= 10 && state.wave % 3 === 0 && Math.random() < 0.4);
+        state.enemies.push(new Enemy(state.wave, fly));
+        state.spawn_count++;
+        state.spawn_timer = state.spawn_delay;
+
+        if (state.spawn_count >= state.spawn_max) {
+            state.spawning = false;
         }
-
-        // Check Top/Bottom Edge
-        if (my < rect.top) my = rect.top + 5;
-        if (my + menuH > rect.bottom) my = rect.bottom - menuH - 5;
-
-        menu.style.left = mx + 'px';
-        menu.style.top = my + 'px';
+    } else {
+        state.spawn_timer--;
     }
+}
 
-    window.close_menu = function () { document.getElementById('upgrade_menu').classList.add('hidden'); state.selection = null; }
+// Entities Update
+state.towers.forEach(t => t.update());
+for (let i = state.enemies.length - 1; i >= 0; i--) {
+    let e = state.enemies[i];
+    e.update();
+    if (e.hp <= 0) state.enemies.splice(i, 1);
+}
+for (let i = state.projectiles.length - 1; i >= 0; i--) {
+    let p = state.projectiles[i];
+    p.update();
+    if (p.hit) state.projectiles.splice(i, 1);
+}
+for (let i = state.particles.length - 1; i >= 0; i--) {
+    let p = state.particles[i];
+    p.life--;
+    if (p.life <= 0) state.particles.splice(i, 1);
+}
 
-    // --- GAME LOOP ---
+// Auto Wave Logic
+// --- GAME LOGIC ---
 
-    window.start_wave = function () {
-        if (state.active || state.game_over || state.spawning) return;
-        state.active = true;
-        state.spawning = true;
-        state.spawn_max = 20 + Math.floor(state.wave * 1.3);
-        state.spawn_count = 0;
-        state.spawn_timer = 0;
-        state.spawn_delay = Math.floor(60 - Math.min(50, state.wave * 1.5)); // In frames (~1s down to ~0.16s)
-    }
-
+function update_logic() {
     // Spawn Logic
     if (state.spawning) {
         if (state.spawn_timer <= 0) {
@@ -1037,438 +1099,399 @@ function build_tower(gx, gy) {
         if (p.life <= 0) state.particles.splice(i, 1);
     }
 
+    if (state.balls) {
+        for (let i = state.balls.length - 1; i >= 0; i--) {
+            let b = state.balls[i];
+            b.update();
+            if (b.dead) state.balls.splice(i, 1);
+        }
+    }
+
     // Auto Wave Logic
-    // --- GAME LOGIC ---
+    if (state.active && !state.spawning && state.enemies.length === 0) {
+        state.active = false;
+        if (!state.game_over) {
+            state.wave++;
+            update_ui();
+            if (state.auto_wave) setTimeout(window.start_wave, 2000);
 
-    function update_logic() {
-        // Spawn Logic
-        if (state.spawning) {
-            if (state.spawn_timer <= 0) {
-                // Air units only after Wave 10
-                let fly = (state.wave >= 10 && state.wave % 3 === 0 && Math.random() < 0.4);
-                state.enemies.push(new Enemy(state.wave, fly));
-                state.spawn_count++;
-                state.spawn_timer = state.spawn_delay;
+            // --- WAVE END LOGIC (Heart, Promoted) ---
+            apply_wave_end_effects();
+        }
+    }
+}
 
-                if (state.spawn_count >= state.spawn_max) {
-                    state.spawning = false;
-                }
-            } else {
-                state.spawn_timer--;
+function apply_wave_end_effects() {
+    state.towers.forEach(t => {
+        // HEART: Burn Life, Double Money
+        if (t.type === 'heart') {
+            if (state.lives > 0) {
+                state.lives--;
+                state.money *= 2;
+                create_explosion(t.gx, t.gy, 1, '#f43f5e'); // Effect
             }
         }
 
-        // Entities Update
-        state.towers.forEach(t => t.update());
+        // PROMOTED: Upgrade host tower
+        if (t.type === 'promoted' && t.host) {
+            t.host.upgrade();
+            create_explosion(t.gx, t.gy, 0.5, '#fbbf24'); // Level Up Effect
+
+            // Check money for upkeep? "quando o usuário fica sem dinheiro, a torre é eliminada"
+            // Does it consume money? User description: "quando o usuário fica sem dinheiro, a torre é eliminada".
+            // Takes no money? Maybe it means "if money == 0"? Or it COSTS money to upgrade?
+            // "cada onda faz o upgrade... Custo: $600 (to build)". 
+            // Maybe it consumes the upgrade cost? "Promoted... quando o usuário fica sem dinheiro".
+            // I will assume it consumes the UPGRADE COST of the host tower.
+            // If can't pay, Promoted is destroyed.
+
+            // Actually, standard upgrade has no cost variable here, it's formula.
+            // Let's blindly upgrade. But the condition "sem dinheiro" implies consumption.
+            // Let's make it consume $100 per wave? Or nothing?
+            // User: "quando o usuário fica sem dinheiro". This implies it drains money?
+            // I'll make it FREE upgrade, but if Money <= 0 it dies? That's rare.
+            // Let's assume it consumes the upgrade value.
+
+            /* Re-reading: "instala sobre uma torre. cada onda faz o upgrade da torre em 1. quando o usuário fica sem dinheiro, a torre é eliminada."
+               Interpretation: It acts as an auto-upgrader that SPENDS your money.
+            */
+
+            const cost = Math.floor(TOWERS[t.host.type].cost * t.host.lvl);
+            if (state.money >= cost) {
+                state.money -= cost;
+                // upgrade done above
+            } else {
+                // Can't afford, destroy promoted
+                t.dead = true;
+            }
+        }
+    });
+
+    // Cleanup dead promoted
+    state.towers = state.towers.filter(t => !t.dead);
+    update_ui();
+}
+
+
+
+function draw_game() {
+    // Background
+    if (BG_IMG.complete) {
+        ctx.drawImage(BG_IMG, 0, 0, canvas.width, canvas.height);
+    } else {
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Grid
+    ctx.strokeStyle = '#334155'; ctx.lineWidth = 1; // Slate-700
+    ctx.beginPath();
+    for (let x = 0; x <= COLS; x++) { ctx.moveTo(x * TILE_SIZE, 0); ctx.lineTo(x * TILE_SIZE, canvas.height); }
+    for (let y = 0; y <= ROWS; y++) { ctx.moveTo(0, y * TILE_SIZE); ctx.lineTo(canvas.width, y * TILE_SIZE); }
+    ctx.stroke();
+
+    // Spawn / Exit
+    ctx.fillStyle = 'rgba(34, 197, 94, 0.15)'; ctx.fillRect(state.spawn.x * TILE_SIZE, state.spawn.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.15)'; ctx.fillRect(state.exit.x * TILE_SIZE, state.exit.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+    // Draw Entities
+    state.towers.filter(t => t.type === 'mine').forEach(t => t.draw(ctx));
+    state.enemies.forEach(e => { if (!e.flying) e.draw(ctx); });
+    if (state.balls) state.balls.forEach(b => b.draw(ctx));
+    state.towers.filter(t => t.type !== 'mine' && t.type !== 'bowling').forEach(t => t.draw(ctx));
+    state.enemies.forEach(e => { if (e.flying) e.draw(ctx); });
+    state.projectiles.forEach(p => p.draw(ctx));
+
+    // Draw Particles
+    state.particles.forEach(p => {
+        const x = p.gx * TILE_SIZE + TILE_SIZE / 2;
+        const y = p.gy * TILE_SIZE + TILE_SIZE / 2;
+        ctx.fillStyle = p.color;
+        if (p.type === 'shockwave') {
+            let r = (1 - p.life / p.max_life) * p.max_size * TILE_SIZE;
+            ctx.globalAlpha = p.life / p.max_life;
+            ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+        } else {
+            let sz = p.size * TILE_SIZE;
+            ctx.fillRect(x + (Math.random() - 0.5) * 10, y + (Math.random() - 0.5) * 10, sz, sz);
+        }
+    });
+}
+
+// BOWLING BALL ENTITY
+class BowlingBall {
+    constructor() {
+        this.gx = state.spawn.x;
+        this.gy = state.spawn.y;
+        this.speed = 0.15;
+        this.dead = false;
+        this.trail = 0;
+    }
+
+    update() {
+        // Simple Movement: Just pick a random valid neighbor that isn't backwards?
+        // Or pure random? "caminho ... é aleatorio"
+        // Let's pick a random neighbor (up, down, left, right) that is within bounds.
+        // To ensure it eventually reaches exit, maybe bias? 
+        // "atravessa ... ate a saida". If pure random, it might never reach.
+        // Let's use Flow Field but with noise?
+        // Or just move towards exit but randomly deviate?
+
+        // Let's do: 50% chance to follow flow field, 50% random neighbor.
+
+        if (Math.abs(this.gx - Math.round(this.gx)) < 0.1 && Math.abs(this.gy - Math.round(this.gy)) < 0.1) {
+            // Center of tile, pick new direction
+            this.gx = Math.round(this.gx);
+            this.gy = Math.round(this.gy);
+
+            // Check collisions at center
+            this.check_collision(); // Kill items
+
+            if (this.gx === state.exit.x && this.gy === state.exit.y) {
+                this.dead = true;
+                return;
+            }
+
+            // Pick next tile
+            const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]].map(d => ({ x: this.gx + d[0], y: this.gy + d[1] }))
+                .filter(n => n.x >= 0 && n.x < COLS && n.y >= 0 && n.y < ROWS);
+
+            // Bias: Flow Field
+            const best = neighbors.sort((a, b) => state.flow_field[a.y][a.x] - state.flow_field[b.y][b.x])[0];
+
+            if (Math.random() < 0.5 && best) {
+                this.target = best;
+            } else {
+                this.target = neighbors[Math.floor(Math.random() * neighbors.length)];
+            }
+        }
+
+        if (this.target) {
+            let dx = this.target.x - this.gx;
+            let dy = this.target.y - this.gy;
+            let d = Math.hypot(dx, dy);
+            if (d < this.speed) {
+                this.gx = this.target.x;
+                this.gy = this.target.y;
+            } else {
+                this.gx += (dx / d) * this.speed;
+                this.gy += (dy / d) * this.speed;
+            }
+        }
+
+        if (this.dead) return;
+        // Continuous collision check for enemies
+        this.check_collision_enemies();
+    }
+
+    check_collision() {
+        // Hit Tower?
+        const t = state.towers.find(t => t.gx === this.gx && t.gy === this.gy && t.type !== 'promoted');
+        if (t) {
+            if (t.type === 'wall') {
+                // Eliminate BOTH
+                this.dead = true;
+            }
+            // Elimina a torre
+            state.grid[t.gy][t.gx] = 0;
+            state.towers = state.towers.filter(x => x !== t);
+            create_explosion(t.gx, t.gy, 0.5, 'black');
+            update_ui();
+            recalc_path();
+        }
+    }
+
+    check_collision_enemies() {
         for (let i = state.enemies.length - 1; i >= 0; i--) {
             let e = state.enemies[i];
-            e.update();
-            if (e.hp <= 0) state.enemies.splice(i, 1);
-        }
-        for (let i = state.projectiles.length - 1; i >= 0; i--) {
-            let p = state.projectiles[i];
-            p.update();
-            if (p.hit) state.projectiles.splice(i, 1);
-        }
-        for (let i = state.particles.length - 1; i >= 0; i--) {
-            let p = state.particles[i];
-            p.life--;
-            if (p.life <= 0) state.particles.splice(i, 1);
-        }
-
-        if (state.balls) {
-            for (let i = state.balls.length - 1; i >= 0; i--) {
-                let b = state.balls[i];
-                b.update();
-                if (b.dead) state.balls.splice(i, 1);
-            }
-        }
-
-        // Auto Wave Logic
-        if (state.active && !state.spawning && state.enemies.length === 0) {
-            state.active = false;
-            if (!state.game_over) {
-                state.wave++;
-                update_ui();
-                if (state.auto_wave) setTimeout(window.start_wave, 2000);
-
-                // --- WAVE END LOGIC (Heart, Promoted) ---
-                apply_wave_end_effects();
+            if (!e.flying && Math.hypot(e.gx - this.gx, e.gy - this.gy) < 0.5) {
+                e.hit(99999, 'bowling');
+                create_explosion(this.gx, this.gy, 0.3, 'black');
             }
         }
     }
 
-    function apply_wave_end_effects() {
-        state.towers.forEach(t => {
-            // HEART: Burn Life, Double Money
-            if (t.type === 'heart') {
-                if (state.lives > 0) {
-                    state.lives--;
-                    state.money *= 2;
-                    create_explosion(t.gx, t.gy, 1, '#f43f5e'); // Effect
-                }
-            }
+    draw(ctx) {
+        const x = this.gx * TILE_SIZE + TILE_SIZE / 2;
+        const y = this.gy * TILE_SIZE + TILE_SIZE / 2;
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(x, y, TILE_SIZE * 0.3, 0, Math.PI * 2); ctx.fill();
 
-            // PROMOTED: Upgrade host tower
-            if (t.type === 'promoted' && t.host) {
-                t.host.upgrade();
-                create_explosion(t.gx, t.gy, 0.5, '#fbbf24'); // Level Up Effect
+        // Holes
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(x - 2, y - 2, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x + 3, y - 3, 2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y + 3, 2, 0, Math.PI * 2); ctx.fill();
+    }
+}
 
-                // Check money for upkeep? "quando o usuário fica sem dinheiro, a torre é eliminada"
-                // Does it consume money? User description: "quando o usuário fica sem dinheiro, a torre é eliminada".
-                // Takes no money? Maybe it means "if money == 0"? Or it COSTS money to upgrade?
-                // "cada onda faz o upgrade... Custo: $600 (to build)". 
-                // Maybe it consumes the upgrade cost? "Promoted... quando o usuário fica sem dinheiro".
-                // I will assume it consumes the UPGRADE COST of the host tower.
-                // If can't pay, Promoted is destroyed.
+function game_loop() {
+    requestAnimationFrame(game_loop);
+    if (state.paused) return;
 
-                // Actually, standard upgrade has no cost variable here, it's formula.
-                // Let's blindly upgrade. But the condition "sem dinheiro" implies consumption.
-                // Let's make it consume $100 per wave? Or nothing?
-                // User: "quando o usuário fica sem dinheiro". This implies it drains money?
-                // I'll make it FREE upgrade, but if Money <= 0 it dies? That's rare.
-                // Let's assume it consumes the upgrade value.
-
-                /* Re-reading: "instala sobre uma torre. cada onda faz o upgrade da torre em 1. quando o usuário fica sem dinheiro, a torre é eliminada."
-                   Interpretation: It acts as an auto-upgrader that SPENDS your money.
-                */
-
-                const cost = Math.floor(TOWERS[t.host.type].cost * t.host.lvl);
-                if (state.money >= cost) {
-                    state.money -= cost;
-                    // upgrade done above
-                } else {
-                    // Can't afford, destroy promoted
-                    t.dead = true;
-                }
-            }
-        });
-
-        // Cleanup dead promoted
-        state.towers = state.towers.filter(t => !t.dead);
-        update_ui();
+    // Multi-step update for speed control
+    for (let i = 0; i < state.speed; i++) {
+        update_logic();
     }
 
+    draw_game();
+}
+
+function update_ui() {
+    document.getElementById('money').innerText = Math.floor(state.money);
+    document.getElementById('lives').innerText = state.lives;
+    document.getElementById('wave').innerText = state.wave;
+}
+
+// --- CONTROLS EXT ---
+
+window.toggle_speed = function () {
+    if (state.speed === 1) state.speed = 2;
+    else if (state.speed === 2) state.speed = 4;
+    else state.speed = 1;
+    update_speed_btn();
+}
+
+function update_speed_btn() {
+    const btn = document.getElementById('btn_speed');
+    if (btn) {
+        btn.innerHTML = `${state.speed}x`;
+        btn.classList.remove('text-slate-400', 'text-yellow-400', 'text-red-500');
+        if (state.speed === 1) btn.classList.add('text-slate-400');
+        if (state.speed === 2) btn.classList.add('text-yellow-400');
+        if (state.speed === 4) btn.classList.add('text-red-500');
+    }
+}
 
 
-    function draw_game() {
-        // Background
-        if (BG_IMG.complete) {
-            ctx.drawImage(BG_IMG, 0, 0, canvas.width, canvas.height);
-        } else {
-            ctx.fillStyle = '#1e293b';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
 
-        // Grid
-        ctx.strokeStyle = '#334155'; ctx.lineWidth = 1; // Slate-700
-        ctx.beginPath();
-        for (let x = 0; x <= COLS; x++) { ctx.moveTo(x * TILE_SIZE, 0); ctx.lineTo(x * TILE_SIZE, canvas.height); }
-        for (let y = 0; y <= ROWS; y++) { ctx.moveTo(0, y * TILE_SIZE); ctx.lineTo(canvas.width, y * TILE_SIZE); }
-        ctx.stroke();
+function init() {
+    state.money = 600; // Starting money
+    state.lives = 20;
+    state.wave = 1;
+    state.active = false;
+    state.game_over = false;
+    state.spawning = false;
+    state.speed = 1;
+    state.grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+    state.towers = [];
+    state.enemies = [];
+    state.projectiles = [];
+    state.particles = [];
+    state.balls = [];
 
-        // Spawn / Exit
-        ctx.fillStyle = 'rgba(34, 197, 94, 0.15)'; ctx.fillRect(state.spawn.x * TILE_SIZE, state.spawn.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.15)'; ctx.fillRect(state.exit.x * TILE_SIZE, state.exit.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    // INHERITANCE LOGIC (Using Modal)
+    const inheritance = parseFloat(localStorage.getItem('td_inheritance'));
+    if (inheritance && inheritance > 0) {
+        const bonus = Math.floor(inheritance);
+        state.money += bonus;
 
-        // Draw Entities
-        state.towers.filter(t => t.type === 'mine').forEach(t => t.draw(ctx));
-        state.enemies.forEach(e => { if (!e.flying) e.draw(ctx); });
-        if (state.balls) state.balls.forEach(b => b.draw(ctx));
-        state.towers.filter(t => t.type !== 'mine' && t.type !== 'bowling').forEach(t => t.draw(ctx));
-        state.enemies.forEach(e => { if (e.flying) e.draw(ctx); });
-        state.projectiles.forEach(p => p.draw(ctx));
+        // Show Inheritance Modal
+        const modal = document.getElementById('modal_inheritance');
+        document.getElementById('inheritance_val').innerText = `+$${bonus}`;
+        modal.classList.remove('hidden');
 
-        // Draw Particles
-        state.particles.forEach(p => {
-            const x = p.gx * TILE_SIZE + TILE_SIZE / 2;
-            const y = p.gy * TILE_SIZE + TILE_SIZE / 2;
-            ctx.fillStyle = p.color;
-            if (p.type === 'shockwave') {
-                let r = (1 - p.life / p.max_life) * p.max_size * TILE_SIZE;
-                ctx.globalAlpha = p.life / p.max_life;
-                ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
-            } else {
-                let sz = p.size * TILE_SIZE;
-                ctx.fillRect(x + (Math.random() - 0.5) * 10, y + (Math.random() - 0.5) * 10, sz, sz);
-            }
-        });
+        localStorage.removeItem('td_inheritance');
     }
 
-    // BOWLING BALL ENTITY
-    class BowlingBall {
-        constructor() {
-            this.gx = state.spawn.x;
-            this.gy = state.spawn.y;
-            this.speed = 0.15;
-            this.dead = false;
-            this.trail = 0;
-        }
+    state.auto_wave = document.getElementById('auto_wave').checked;
+    update_speed_btn();
 
-        update() {
-            // Simple Movement: Just pick a random valid neighbor that isn't backwards?
-            // Or pure random? "caminho ... é aleatorio"
-            // Let's pick a random neighbor (up, down, left, right) that is within bounds.
-            // To ensure it eventually reaches exit, maybe bias? 
-            // "atravessa ... ate a saida". If pure random, it might never reach.
-            // Let's use Flow Field but with noise?
-            // Or just move towards exit but randomly deviate?
+    resize();
+    recalc_path();
+    update_ui();
+    document.getElementById('game_over').classList.add('hidden');
+}
 
-            // Let's do: 50% chance to follow flow field, 50% random neighbor.
+// --- GAME OVER LOGIC ---
 
-            if (Math.abs(this.gx - Math.round(this.gx)) < 0.1 && Math.abs(this.gy - Math.round(this.gy)) < 0.1) {
-                // Center of tile, pick new direction
-                this.gx = Math.round(this.gx);
-                this.gy = Math.round(this.gy);
+// --- GAME OVER LOGIC ---
 
-                // Check collisions at center
-                this.check_collision(); // Kill items
+function game_over() {
+    if (state.game_over) return;
+    state.game_over = true;
+    state.active = false;
+    state.spawning = false;
 
-                if (this.gx === state.exit.x && this.gy === state.exit.y) {
-                    this.dead = true;
-                    return;
-                }
+    // SAVE INHERITANCE
+    // Formula: Money * (100 - Wave) / 200
+    // If Wave >= 100, Inheritance is <= 0 -> "Deserdado"
+    const inheritance = state.money * ((100 - state.wave) / 200.0);
 
-                // Pick next tile
-                const neighbors = [[0, 1], [0, -1], [1, 0], [-1, 0]].map(d => ({ x: this.gx + d[0], y: this.gy + d[1] }))
-                    .filter(n => n.x >= 0 && n.x < COLS && n.y >= 0 && n.y < ROWS);
+    const el_inh = document.getElementById('final_inheritance');
 
-                // Bias: Flow Field
-                const best = neighbors.sort((a, b) => state.flow_field[a.y][a.x] - state.flow_field[b.y][b.x])[0];
-
-                if (Math.random() < 0.5 && best) {
-                    this.target = best;
-                } else {
-                    this.target = neighbors[Math.floor(Math.random() * neighbors.length)];
-                }
-            }
-
-            if (this.target) {
-                let dx = this.target.x - this.gx;
-                let dy = this.target.y - this.gy;
-                let d = Math.hypot(dx, dy);
-                if (d < this.speed) {
-                    this.gx = this.target.x;
-                    this.gy = this.target.y;
-                } else {
-                    this.gx += (dx / d) * this.speed;
-                    this.gy += (dy / d) * this.speed;
-                }
-            }
-
-            if (this.dead) return;
-            // Continuous collision check for enemies
-            this.check_collision_enemies();
-        }
-
-        check_collision() {
-            // Hit Tower?
-            const t = state.towers.find(t => t.gx === this.gx && t.gy === this.gy && t.type !== 'promoted');
-            if (t) {
-                if (t.type === 'wall') {
-                    // Eliminate BOTH
-                    this.dead = true;
-                }
-                // Elimina a torre
-                state.grid[t.gy][t.gx] = 0;
-                state.towers = state.towers.filter(x => x !== t);
-                create_explosion(t.gx, t.gy, 0.5, 'black');
-                update_ui();
-                recalc_path();
-            }
-        }
-
-        check_collision_enemies() {
-            for (let i = state.enemies.length - 1; i >= 0; i--) {
-                let e = state.enemies[i];
-                if (!e.flying && Math.hypot(e.gx - this.gx, e.gy - this.gy) < 0.5) {
-                    e.hit(99999, 'bowling');
-                    create_explosion(this.gx, this.gy, 0.3, 'black');
-                }
-            }
-        }
-
-        draw(ctx) {
-            const x = this.gx * TILE_SIZE + TILE_SIZE / 2;
-            const y = this.gy * TILE_SIZE + TILE_SIZE / 2;
-            ctx.fillStyle = '#000';
-            ctx.beginPath(); ctx.arc(x, y, TILE_SIZE * 0.3, 0, Math.PI * 2); ctx.fill();
-
-            // Holes
-            ctx.fillStyle = '#fff';
-            ctx.beginPath(); ctx.arc(x - 2, y - 2, 2, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(x + 3, y - 3, 2, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(x, y + 3, 2, 0, Math.PI * 2); ctx.fill();
-        }
+    if (inheritance > 0) {
+        localStorage.setItem('td_inheritance', inheritance);
+        el_inh.innerText = `+$${Math.floor(inheritance)}`;
+        el_inh.classList.remove('text-red-500');
+        el_inh.classList.add('text-yellow-400');
+    } else {
+        localStorage.removeItem('td_inheritance');
+        el_inh.innerText = "DESERDADO";
+        el_inh.classList.remove('text-yellow-400');
+        el_inh.classList.add('text-red-500');
     }
 
-    function game_loop() {
-        requestAnimationFrame(game_loop);
-        if (state.paused) return;
+    // Populate Results
+    document.getElementById('final_wave').innerText = state.wave;
+    document.getElementById('final_money').innerText = `$${Math.floor(state.money)}`;
+    document.getElementById('final_inheritance').innerText = `+$${Math.floor(inheritance)}`;
 
-        // Multi-step update for speed control
-        for (let i = 0; i < state.speed; i++) {
-            update_logic();
-        }
+    // Show Game Over Screen (No High Scores)
+    document.getElementById('game_over').classList.remove('hidden');
+}
 
-        draw_game();
-    }
-
-    function update_ui() {
-        document.getElementById('money').innerText = Math.floor(state.money);
-        document.getElementById('lives').innerText = state.lives;
-        document.getElementById('wave').innerText = state.wave;
-    }
-
-    // --- CONTROLS EXT ---
-
-    window.toggle_speed = function () {
-        if (state.speed === 1) state.speed = 2;
-        else if (state.speed === 2) state.speed = 4;
-        else state.speed = 1;
-        update_speed_btn();
-    }
-
-    function update_speed_btn() {
-        const btn = document.getElementById('btn_speed');
-        if (btn) {
-            btn.innerHTML = `${state.speed}x`;
-            btn.classList.remove('text-slate-400', 'text-yellow-400', 'text-red-500');
-            if (state.speed === 1) btn.classList.add('text-slate-400');
-            if (state.speed === 2) btn.classList.add('text-yellow-400');
-            if (state.speed === 4) btn.classList.add('text-red-500');
-        }
-    }
-
-
-
-    function init() {
-        state.money = 600; // Starting money
-        state.lives = 20;
-        state.wave = 1;
-        state.active = false;
-        state.game_over = false;
-        state.spawning = false;
-        state.speed = 1;
-        state.grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
-        state.towers = [];
-        state.enemies = [];
-        state.projectiles = [];
-        state.particles = [];
-        state.balls = [];
-
-        // INHERITANCE LOGIC (Using Modal)
-        const inheritance = parseFloat(localStorage.getItem('td_inheritance'));
-        if (inheritance && inheritance > 0) {
-            const bonus = Math.floor(inheritance);
-            state.money += bonus;
-
-            // Show Inheritance Modal
-            const modal = document.getElementById('modal_inheritance');
-            document.getElementById('inheritance_val').innerText = `+$${bonus}`;
-            modal.classList.remove('hidden');
-
-            localStorage.removeItem('td_inheritance');
-        }
-
-        state.auto_wave = document.getElementById('auto_wave').checked;
-        update_speed_btn();
-
-        resize();
-        recalc_path();
-        update_ui();
-        document.getElementById('game_over').classList.add('hidden');
-    }
-
-    // --- GAME OVER LOGIC ---
-
-    // --- GAME OVER LOGIC ---
-
-    function game_over() {
-        if (state.game_over) return;
-        state.game_over = true;
-        state.active = false;
-        state.spawning = false;
-
-        // SAVE INHERITANCE
-        // Formula: Money * (100 - Wave) / 200
-        // If Wave >= 100, Inheritance is <= 0 -> "Deserdado"
-        const inheritance = state.money * ((100 - state.wave) / 200.0);
-
-        const el_inh = document.getElementById('final_inheritance');
-
-        if (inheritance > 0) {
-            localStorage.setItem('td_inheritance', inheritance);
-            el_inh.innerText = `+$${Math.floor(inheritance)}`;
-            el_inh.classList.remove('text-red-500');
-            el_inh.classList.add('text-yellow-400');
-        } else {
-            localStorage.removeItem('td_inheritance');
-            el_inh.innerText = "DESERDADO";
-            el_inh.classList.remove('text-yellow-400');
-            el_inh.classList.add('text-red-500');
-        }
-
-        // Populate Results
-        document.getElementById('final_wave').innerText = state.wave;
-        document.getElementById('final_money').innerText = `$${Math.floor(state.money)}`;
-        document.getElementById('final_inheritance').innerText = `+$${Math.floor(inheritance)}`;
-
-        // Show Game Over Screen (No High Scores)
-        document.getElementById('game_over').classList.remove('hidden');
-    }
-
-    window.restart_game = function () {
-        document.getElementById('game_over').classList.add('hidden');
-        document.getElementById('auto_wave').checked = false;
-        init();
-    }
-
-    window.toggle_pause = function () { state.paused = !state.paused; }
-
+window.restart_game = function () {
+    document.getElementById('game_over').classList.add('hidden');
+    document.getElementById('auto_wave').checked = false;
     init();
-    game_loop();
-    // --- TOWER DICTIONARY ---
-    window.toggle_dictionary = function () {
-        const el = document.getElementById('tower_dictionary');
-        const is_hidden = el.classList.contains('hidden');
+}
 
-        if (is_hidden) {
-            // Open
-            el.classList.remove('hidden');
-            state.paused = true;
-            render_dict_list();
-        } else {
-            // Close
-            el.classList.add('hidden');
-            state.paused = false;
-        }
+window.toggle_pause = function () { state.paused = !state.paused; }
+
+init();
+game_loop();
+// --- TOWER DICTIONARY ---
+window.toggle_dictionary = function () {
+    const el = document.getElementById('tower_dictionary');
+    const is_hidden = el.classList.contains('hidden');
+
+    if (is_hidden) {
+        // Open
+        el.classList.remove('hidden');
+        state.paused = true;
+        render_dict_list();
+    } else {
+        // Close
+        el.classList.add('hidden');
+        state.paused = false;
     }
+}
 
-    function render_dict_list() {
-        const list = document.getElementById('dict_list');
-        list.innerHTML = '';
+function render_dict_list() {
+    const list = document.getElementById('dict_list');
+    list.innerHTML = '';
 
-        Object.keys(TOWERS).forEach(key => {
-            const t = TOWERS[key];
-            const btn = document.createElement('button');
-            btn.className = "aspect-square bg-slate-800 border border-slate-600 rounded hover:bg-slate-700 hover:border-indigo-500 transition flex items-center justify-center p-1 group";
-            btn.onclick = () => show_dict_details(key);
-
-            const img = document.createElement('img');
-            img.src = t.img;
-            img.className = "w-full h-full object-contain opacity-70 group-hover:opacity-100 transition";
-
-            btn.appendChild(img);
-            list.appendChild(btn);
-        });
-    }
-
-    function show_dict_details(key) {
+    Object.keys(TOWERS).forEach(key => {
         const t = TOWERS[key];
-        const details = document.getElementById('dict_details');
+        const btn = document.createElement('button');
+        btn.className = "aspect-square bg-slate-800 border border-slate-600 rounded hover:bg-slate-700 hover:border-indigo-500 transition flex items-center justify-center p-1 group";
+        btn.onclick = () => show_dict_details(key);
 
-        details.innerHTML = `
+        const img = document.createElement('img');
+        img.src = t.img;
+        img.className = "w-full h-full object-contain opacity-70 group-hover:opacity-100 transition";
+
+        btn.appendChild(img);
+        list.appendChild(btn);
+    });
+}
+
+function show_dict_details(key) {
+    const t = TOWERS[key];
+    const details = document.getElementById('dict_details');
+
+    details.innerHTML = `
         <div class="relative mb-4">
             <div class="absolute inset-0 bg-indigo-500 blur-2xl opacity-20"></div>
             <img src="${t.img}" class="w-24 h-24 object-contain relative z-10 drop-shadow-lg animate-bounce-slow">
@@ -1498,6 +1521,4 @@ function build_tower(gx, gy) {
             </div>
         </div>
     `;
-    }
-}
 }
