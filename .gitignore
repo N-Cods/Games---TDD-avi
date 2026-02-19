@@ -1,0 +1,19 @@
+# System
+.DS_Store
+Thumbs.db
+
+# Project Dependencies
+node_modules/
+.env
+.env.local
+
+# Unrelated Projects (Co-located in PWA folder)
+CurriculoAI/
+N Planners/
+PWA ARQUIVADOS/
+SGS TIM/
+Skills/
+Tower Defense/
+
+# Misc
+*.log

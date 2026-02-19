@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maze Hub Games Davi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            /* Fallback color */
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+            /* Background Image Logic */
+            background-image: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.95)), url('./assets/images/background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+
+        .game-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center p-8">
+
+    <header class="mb-12 text-center">
+        <h1
+            class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600 mb-4 drop-shadow-sm">
+            Maze Hub Games Davi
+        </h1>
+        <p class="text-slate-300 text-lg">Bem-vindo à coleção de jogos do Davi!</p>
+    </header>
+
+    <main class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 w-full max-w-6xl">
+
+        <!-- CARD: TOWER DEFENSE -->
+        <a href="./games/tower-defense/index.html"
+            class="game-card block bg-slate-800/80 backdrop-blur-sm rounded-xl overflow-hidden border border-slate-700/50 group relative">
+            <div class="aspect-video w-full bg-black relative">
+                <video autoplay loop muted playsinline
+                    class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition duration-300">
+                    <source src="./games/tower-defense/img/animate.mp4" type="video/mp4">
+                    Seu navegador não suporta vídeo.
+                </video>
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-60"></div>
+                <div class="absolute bottom-4 left-4">
+                    <h2 class="text-2xl font-bold text-white shadow-black drop-shadow-lg">Tower Defense</h2>
+                    <span
+                        class="text-xs font-bold uppercase tracking-wider text-green-400 bg-green-900/50 px-2 py-1 rounded border border-green-500/30">Novo</span>
+                </div>
+            </div>
+            <div class="p-4">
+                <p class="text-slate-300 text-sm">Defenda a base contra ondas infinitas de inimigos! Construa
+                    estrategicamente e sobreviva.</p>
+            </div>
+        </a>
+
+        <!-- CARD: QUICK GAME 1 -->
+        <a href="./games/quick-game-1/index.html"
+            class="game-card block bg-slate-800/80 backdrop-blur-sm rounded-xl overflow-hidden border border-slate-700/50 group relative opacity-75 hover:opacity-100">
+            <div class="aspect-video w-full bg-slate-900 relative flex items-center justify-center">
+                <span class="text-4xl">🚀</span>
+            </div>
+            <div class="p-4">
+                <h2 class="text-xl font-bold text-white mb-1">Jogo Rápido 1</h2>
+                <p class="text-slate-400 text-xs">Em desenvolvimento...</p>
+            </div>
+        </a>
+
+        <!-- CARD: QUICK GAME 2 -->
+        <a href="./games/quick-game-2/index.html"
+            class="game-card block bg-slate-800/80 backdrop-blur-sm rounded-xl overflow-hidden border border-slate-700/50 group relative opacity-75 hover:opacity-100">
+            <div class="aspect-video w-full bg-slate-900 relative flex items-center justify-center">
+                <span class="text-4xl">🎮</span>
+            </div>
+            <div class="p-4">
+                <h2 class="text-xl font-bold text-white mb-1">Jogo Rápido 2</h2>
+                <p class="text-slate-400 text-xs">Em desenvolvimento...</p>
+            </div>
+        </a>
+
+    </main>
+
+    <footer class="mt-16 text-slate-500 text-sm text-center">
+        &copy; 2026 Maze Hub Games Davi. Todos os direitos reservados.
+    </footer>
+
+</body>
+
+</html>
