@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
+    <title>Tower Defense</title>
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="./style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body>
+
+    <div id="orientation_warning">
+        <div class="text-6xl mb-4 animate-bounce">🔄</div>
+        <h2 class="text-xl font-bold text-white">Gire o celular</h2>
+    </div>
+
+    <!-- ESQUERDA: STATS E CONTROLES -->
+    <div id="left_sidebar">
+        <div class="flex flex-col gap-2">
+            <div class="stat-box">
+                <div class="stat-row text-red-400 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                        fill="currentColor" stroke="none" class="mr-1">
+                        <path
+                            d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg>
+                    <span id="lives">20</span>
+                </div>
+                <div class="stat-row text-yellow-400 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        class="mr-1">
+                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>
+                    <span id="money">600</span>
+                </div>
+                <div class="stat-row text-blue-400 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                        fill="currentColor" stroke="none" class="mr-1">
+                        <path
+                            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                    </svg>
+                    <span id="wave">1</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <button onclick="toggle_pause()" class="icon-btn" title="Pausar">⏸</button>
+                <button onclick="restart_game()" class="icon-btn" title="Reiniciar">↺</button>
+                <button onclick="toggle_speed()" id="btn_speed" class="icon-btn font-bold text-slate-400"
+                    title="Velocidade">1x</button>
+            </div>
+            <button onclick="toggle_fullscreen()" class="icon-btn w-full" title="Tela Cheia">⛶</button>
+        </div>
+
+        <div id="wave_control">
+            <div class="flex items-center justify-center gap-2 mb-2 bg-slate-800 p-1 rounded">
+                <input type="checkbox" id="auto_wave" class="w-3 h-3 accent-indigo-500 rounded cursor-pointer">
+                <label for="auto_wave" class="text-[9px] text-slate-300 font-bold cursor-pointer select-none">AUTO
+                    WAVE</label>
+            </div>
+            <button onclick="start_wave()" id="btn_wave" class="animate-pulse">
+                Iniciar<br>Onda
+            </button>
+        </div>
+    </div>
+
+    <!-- CENTRO: JOGO -->
+    <div id="game_area">
+
+
+        <!-- Menu Upgrade -->
+        <!-- Menu Upgrade Centered -->
+        <div id="upgrade_menu"
+            class="hidden fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-64 bg-slate-900 border-2 border-slate-600 rounded-xl shadow-2xl p-4 flex flex-col gap-3">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                <span id="upg_title" class="text-sm font-black text-white uppercase tracking-wider">TOWER</span>
+                <button onclick="close_menu()" class="text-slate-400 hover:text-white px-2 font-bold">✕</button>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-2 gap-2 text-[10px] text-slate-300">
+                <div class="bg-slate-800 p-2 rounded">
+                    <p class="text-slate-500 uppercase font-bold mb-1">Dano</p>
+                    <div class="flex items-center gap-1">
+                        <span id="stat_dmg" class="text-white font-mono text-base">100</span>
+                        <span class="text-slate-600">➜</span>
+                        <span id="stat_dmg_next" class="text-green-400 font-mono text-base font-bold">150</span>
+                    </div>
+                </div>
+                <div class="bg-slate-800 p-2 rounded">
+                    <p class="text-slate-500 uppercase font-bold mb-1">Alcance</p>
+                    <div class="flex items-center gap-1">
+                        <span id="stat_rng" class="text-white font-mono text-base">2.5</span>
+                        <span class="text-slate-600">➜</span>
+                        <span id="stat_rng_next" class="text-green-400 font-mono text-base font-bold">3.0</span>
+                    </div>
+                </div>
+                <div class="bg-slate-800 p-2 rounded">
+                    <p class="text-slate-500 uppercase font-bold mb-1">Cadência</p>
+                    <div class="flex items-center gap-1">
+                        <span id="stat_rate" class="text-white font-mono text-base">60</span>
+                        <span class="text-slate-600">➜</span>
+                        <span id="stat_rate_next" class="text-green-400 font-mono text-base font-bold">50</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-3 mt-2">
+                <button id="btn_upgrade"
+                    class="bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg font-bold flex flex-col items-center justify-center transition border-b-4 border-green-800 active:border-b-0 active:translate-y-1">
+                    <span class="text-xs">UPGRADE</span>
+                    <span class="text-[10px] text-green-200">$<span id="val_upg"></span></span>
+                </button>
+                <button id="btn_sell"
+                    class="bg-red-900/80 hover:bg-red-700 text-white py-3 rounded-lg font-bold flex flex-col items-center justify-center transition border-b-4 border-red-950 active:border-b-0 active:translate-y-1">
+                    <span class="text-xs">VENDER</span>
+                    <span class="text-[10px] text-red-200">+$<span id="val_sell"></span></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tela Game Over -->
+        <div id="game_over"
+            class="hidden absolute inset-0 bg-cover bg-center flex flex-col items-center justify-center z-50 p-4 text-center"
+            style="background-image: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85)), url('./img/background-game_over.jpg');">
+
+            <!-- RESULT CARD -->
+            <div
+                class="bg-black/60 border border-slate-700 p-6 rounded-xl backdrop-blur-sm shadow-2xl w-full max-w-sm animate-fade-in-up">
+                <h1
+                    class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-600 mb-2 drop-shadow-md">
+                    GAME OVER
+                </h1>
+
+                <div class="grid grid-cols-2 gap-4 my-6 text-left">
+                    <div class="bg-slate-800/50 p-3 rounded border border-slate-700">
+                        <p class="text-[10px] text-slate-400 uppercase tracking-wider">Onda Final</p>
+                        <p id="final_wave" class="text-2xl font-bold text-white leading-none">0</p>
+                    </div>
+                    <div class="bg-slate-800/50 p-3 rounded border border-slate-700">
+                        <p class="text-[10px] text-slate-400 uppercase tracking-wider">Grana Final</p>
+                        <p id="final_money" class="text-xl font-bold text-green-400 leading-none">$0</p>
+                    </div>
+                    <div class="col-span-2 bg-indigo-900/30 p-3 rounded border border-indigo-500/30">
+                        <p class="text-[10px] text-indigo-300 uppercase tracking-wider">Herança Gerada (Próx. Jogo)</p>
+                        <p id="final_inheritance" class="text-xl font-bold text-yellow-400 leading-none">+$0</p>
+                    </div>
+                </div>
+
+
+
+                <button onclick="restart_game()"
+                    class="w-full bg-indigo-600 hover:bg-indigo-500 py-3 rounded-lg font-black text-white shadow-lg text-sm transition transform hover:scale-105 border-b-4 border-indigo-800 active:border-b-0 active:translate-y-1">
+                    JOGAR NOVAMENTE
+                </button>
+            </div>
+        </div>
+
+        <!-- INHERITANCE MODAL -->
+        <div id="modal_inheritance"
+            class="hidden absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div
+                class="bg-slate-900 border border-yellow-500/50 p-6 rounded-xl shadow-2xl max-w-sm text-center animate-bounce-in">
+                <div class="text-4xl mb-2">🎁</div>
+                <h2 class="text-2xl font-bold text-yellow-400 mb-1">Herança Recebida!</h2>
+                <p class="text-slate-400 text-sm mb-4">Graças ao seu desempenho anterior, você recebeu um bônus inicial.
+                </p>
+                <div class="bg-slate-800 p-4 rounded-lg mb-6 border border-slate-700">
+                    <span class="text-3xl font-bold text-green-400" id="inheritance_val">+$0</span>
+                </div>
+                <button onclick="document.getElementById('modal_inheritance').classList.add('hidden')"
+                    class="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-6 rounded-lg transition border-b-4 border-yellow-800 active:border-b-0 active:translate-y-1">
+                    RECEBER
+                </button>
+            </div>
+        </div>
+
+
+        <!-- TOWER DETAIL MODAL -->
+        <div id="tower_detail_modal"
+            class="hidden absolute inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center animate-fade-in">
+            <div
+                class="bg-slate-900 border-2 border-slate-700 rounded-2xl p-6 max-w-lg w-full shadow-2xl flex flex-col gap-4 relative">
+                <button onclick="close_tower_detail()"
+                    class="absolute top-4 right-4 text-slate-400 hover:text-white transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                        stroke="currentColor" class="w-8 h-8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+
+                <!-- Header -->
+                <div class="flex items-center gap-4 border-b border-slate-800 pb-4">
+                    <img id="detail_img" src="" class="w-16 h-16 object-contain">
+                    <div>
+                        <h2 id="detail_name" class="text-2xl font-black text-white uppercase tracking-wider">NAME</h2>
+                        <span id="detail_type"
+                            class="text-xs bg-indigo-900 text-indigo-300 px-2 py-1 rounded font-mono">TYPE</span>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-800 min-h-[80px]">
+                    <p id="detail_desc" class="text-slate-300 text-sm leading-relaxed">Description goes here...</p>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-4 gap-2">
+                    <div class="stat-card bg-slate-800 p-2 rounded text-center">
+                        <p class="text-[10px] text-slate-500 uppercase font-bold">Custo</p>
+                        <p id="detail_cost" class="text-yellow-400 font-mono font-bold text-lg">0</p>
+                    </div>
+                    <div class="stat-card bg-slate-800 p-2 rounded text-center">
+                        <p class="text-[10px] text-slate-500 uppercase font-bold">Dano</p>
+                        <p id="detail_dmg" class="text-white font-mono font-bold text-lg">0</p>
+                    </div>
+                    <div class="stat-card bg-slate-800 p-2 rounded text-center">
+                        <p class="text-[10px] text-slate-500 uppercase font-bold">Alcance</p>
+                        <p id="detail_rng" class="text-white font-mono font-bold text-lg">0</p>
+                    </div>
+                    <div class="stat-card bg-slate-800 p-2 rounded text-center">
+                        <p class="text-[10px] text-slate-500 uppercase font-bold">Rate</p>
+                        <p id="detail_rate" class="text-white font-mono font-bold text-lg">0</p>
+                    </div>
+                </div>
+
+                <p class="text-center text-[10px] text-slate-600 mt-2">Segure para ver detalhes • Clique para selecionar
+                </p>
+            </div>
+        </div>
+
+        <!-- CANVAS GAME -->
+        <canvas id="game_canvas" class="block max-w-full max-h-full mx-auto shadow-2xl"></canvas>
+    </div>
+
+    <!-- DIREITA: TORRES -->
+    <div id="right_sidebar">
+
+
+        <div class="text-[9px] text-center text-slate-500 font-bold uppercase mb-1 border-b border-slate-800 pb-1">
+            Arsenal</div>
+
+        <!-- WALL -->
+        <button class="tower_btn active" onclick="select_tower('wall')">
+            <img src="./img/weapon-wall.svg" draggable="false" class="w-8 h-8 opacity-80">
+            <span class="text-[8px] font-bold text-slate-300">WALL</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$50</span>
+        </button>
+
+        <!-- CANNON -->
+        <button class="tower_btn" onclick="select_tower('cannon')">
+            <img src="./img/weapon-cannon.svg" draggable="false" class="w-8 h-8 opacity-90">
+            <span class="text-[8px] font-bold text-slate-300">CANNON</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$50</span>
+        </button>
+
+        <!-- MG -->
+        <button class="tower_btn" onclick="select_tower('mg')">
+            <img src="./img/weapon-machine-gun.svg" draggable="false" class="w-8 h-8 opacity-90">
+            <span class="text-[8px] font-bold text-slate-300">M.GUN</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$150</span>
+        </button>
+
+        <!-- SNIPER -->
+        <button class="tower_btn" onclick="select_tower('sniper')">
+            <img src="./img/weapon-sniper.svg" draggable="false" class="w-8 h-8 opacity-90">
+            <span class="text-[8px] font-bold text-slate-300">SNIPER</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$250</span>
+        </button>
+
+        <!-- POISON -->
+        <button class="tower_btn" onclick="select_tower('poison')">
+            <img src="./img/weapon-poison.svg" draggable="false" class="w-8 h-8 opacity-90">
+            <span class="text-[8px] font-bold text-slate-300">POISON</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$150</span>
+        </button>
+
+        <!-- AA -->
+        <button class="tower_btn" onclick="select_tower('aa')">
+            <img src="./img/weapon-anti-aereo.svg" draggable="false" class="w-8 h-8 opacity-90">
+            <span class="text-[8px] font-bold text-slate-300">AAA</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$300</span>
+        </button>
+
+        <!-- MINE -->
+        <button class="tower_btn" onclick="select_tower('mine')">
+            <img src="./img/weapon-mine.svg" draggable="false" class="w-8 h-8 opacity-90 animate-pulse">
+            <span class="text-[8px] font-bold text-red-300">MINE</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$500</span>
+        </button>
+
+        <!-- BAZOOKA -->
+        <button class="tower_btn" onclick="select_tower('bazooka')">
+            <img src="./img/weapon-bazooka.svg" draggable="false" class="w-8 h-8 opacity-90">
+            <span class="text-[8px] font-bold text-slate-300">BAZOOKA</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$500</span>
+        </button>
+
+        <!-- NOVAS TORRES -->
+
+        <!-- BOWLING -->
+        <button class="tower_btn" onclick="select_tower('bowling')">
+            <img src="./img/weapon-bowling.svg" draggable="false" class="w-8 h-8 opacity-90">
+            <span class="text-[8px] font-bold text-slate-300">BOWLING</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$10</span>
+        </button>
+
+        <!-- DICE -->
+        <button class="tower_btn" onclick="select_tower('dice')">
+            <img src="./img/weapon-dice.svg" draggable="false" class="w-8 h-8 opacity-90">
+            <span class="text-[8px] font-bold text-slate-300">DICE</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$400</span>
+        </button>
+
+        <!-- PACMAN -->
+        <button class="tower_btn" onclick="select_tower('pacman')">
+            <img src="./img/weapon-pacmam.svg" draggable="false" class="w-8 h-8 opacity-90">
+            <span class="text-[8px] font-bold text-yellow-300">PACMAN</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$300</span>
+        </button>
+
+        <!-- LOLLIPOP -->
+        <button class="tower_btn" onclick="select_tower('lollipop')">
+            <img src="./img/weapon-lollipop.svg" draggable="false" class="w-8 h-8 opacity-90">
+            <span class="text-[8px] font-bold text-pink-300">LOLLIPOP</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$400</span>
+        </button>
+
+        <!-- PROMOTED -->
+        <button class="tower_btn" onclick="select_tower('promoted')">
+            <img src="./img/weapon-promoted.svg" draggable="false" class="w-8 h-8 opacity-90">
+            <span class="text-[8px] font-bold text-slate-300">PROMOTED</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$600</span>
+        </button>
+
+        <!-- POWERUP -->
+        <button class="tower_btn" onclick="select_tower('powerup')">
+            <img src="./img/weapon-powerup.svg" draggable="false" class="w-8 h-8 opacity-90">
+            <span class="text-[8px] font-bold text-blue-300">POWERUP</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$1000</span>
+        </button>
+
+        <!-- HEART -->
+        <button class="tower_btn" onclick="select_tower('heart')">
+            <img src="./img/weapon-heart-on-fire.svg" draggable="false" class="w-8 h-8 opacity-90 animate-pulse">
+            <span class="text-[8px] font-bold text-red-500">HEART</span>
+            <span class="text-[8px] text-yellow-500 font-mono">$1500</span>
+        </button>
+    </div>
+
+    <script src="./game.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+                .then(() => console.log("Service Worker Registered"))
+                .catch(err => console.log("Service Worker Failed", err));
+        }
+    </script>
+</body>
+
+</html>
