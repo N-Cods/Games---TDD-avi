@@ -52,19 +52,19 @@ const TOWERS = {
     cannon: { name: "Canhão", cost: 50, rng: 2.0, dmg: 10, rate: 60, type: 'ground', img: './img/weapon-cannon.svg', upgrade_factor: 1.25, desc: "Dano básico. Bom custo-benefício para início de jogo." },
     mg: { name: "Metralha", cost: 150, rng: 3.0, dmg: 100, rate: 6, type: 'ground', img: './img/weapon-machine-gun.svg', upgrade_factor: 1.25, desc: "Alta cadência de tiro. Derrete inimigos rápidos e fracos." },
     sniper: { name: "Sniper", cost: 250, rng: 10.0, dmg: 99999, rate: 60, type: 'all', img: './img/weapon-sniper.svg', upgrade_factor: 1.25, desc: "Alcance infinito. Elimina alvos prioritários com um tiro." },
-    poison: { name: "Veneno", cost: 150, rng: 3.0, dmg: 0, rate: 0, type: 'all', img: './img/weapon-poison.svg', slow: 0.3, upgrade_factor: 1.25, is_aura: true, desc: "Aura tóxica que retarda e danifica inimigos próximos." },
+    poison: { name: "Veneno", cost: 150, rng: 3.0, dmg: 0, rate: 0, type: 'all', img: './img/weapon-poison.svg', slow: 0.3, upgrade_factor: 1.25, is_aura: true, desc: "Aura tóxica que retarda (30%) inimigos na área. Upgrade aumenta efeito." },
     aa: { name: "Anti-Aereo", cost: 300, rng: 5.0, dmg: 100, rate: 12, type: 'air', img: './img/weapon-anti-aereo.svg', upgrade_factor: 1.25, desc: "Defesa vital contra ameaças aéreas. Dano alto vs Voo." },
-    mine: { name: "Mina", cost: 500, rng: 1.5, dmg: 99999, rate: 0, type: 'ground', img: './img/weapon-mine.svg', is_trap: true, single_use: true, upgrade_factor: 1.25, desc: "Armadilha explosiva de uso único. Dano massivo em área." },
-    bazooka: { name: "Bazooka", cost: 500, rng: 4.0, dmg: 100, rate: 60, type: 'all', img: './img/weapon-bazooka.svg', aoe: 1.5, upgrade_factor: 1.25, desc: "Dispara mísseis com grande área de explosão." },
+    mine: { name: "Mina", cost: 500, rng: 1.5, dmg: 99999, rate: 0, type: 'ground', img: './img/weapon-mine.svg', is_trap: true, single_use: true, upgrade_factor: 1.25, desc: "Explode ao contato. Dano massivo em área." },
+    bazooka: { name: "Bazooka", cost: 500, rng: 4.0, dmg: 100, rate: 60, type: 'all', img: './img/weapon-bazooka.svg', aoe: 1.5, upgrade_factor: 1.25, desc: "Dispara foguetes com grande área de explosão." },
 
     // NEW TOWERS
-    bowling: { name: "Boliche", cost: 10, rng: 0, dmg: 99999, rate: 0, type: 'ground', img: './img/weapon-bowling.svg', is_projectile: true, desc: "Lança uma bola pesada que atropela inimigos em linha." },
-    dice: { name: "Dado", cost: 400, rng: 5.0, dmg: 0, rate: 300, type: 'all', img: './img/weapon-dice.svg', is_rng: true, desc: "Sorte ou azar? Pode matar todos ou não fazer nada." },
-    heart: { name: "Coração", cost: 1500, rng: 0, dmg: 0, rate: 0, type: 'none', img: './img/weapon-heart-on-fire.svg', is_eco: true, desc: "Regenera vidas do jogador ao final de cada onda." },
-    lollipop: { name: "Pirulito", cost: 400, rng: 2.5, dmg: 0, rate: 0, type: 'all', img: './img/weapon-lollipop.svg', is_aura: true, slow: 0.9, desc: "Aura pegajosa que deixa os inimigos super lentos." },
-    pacman: { name: "Pacman", cost: 300, rng: 0.5, dmg: 99999, rate: 0, type: 'ground', img: './img/weapon-pacmam.svg', is_trap: true, start_lvl: 10, desc: "Devora inimigos instantaneamente, mas perde nível." },
-    powerup: { name: "Powerup", cost: 1000, rng: 99, dmg: 0, rate: 0, type: 'none', img: './img/weapon-powerup.svg', is_buff: true, buff_type: 'cannon', desc: "Buff global: Aumenta o dano de todos os Canhões." },
-    promoted: { name: "Promoted", cost: 600, rng: 1.5, dmg: 0, rate: 0, type: 'none', img: './img/weapon-promoted.svg', is_buff: true, buff_type: 'neighbor', desc: "Sacrifica-se para evoluir uma torre vizinha." }
+    bowling: { name: "Boliche", cost: 10, rng: 0, dmg: 99999, rate: 0, type: 'ground', img: './img/weapon-bowling.svg', is_projectile: true, desc: "Atravessa o mapa eliminando tudo no caminho (inimigos e torres). Bloqueada por Paredes." },
+    dice: { name: "Dado", cost: 400, rng: 5.0, dmg: 0, rate: 300, type: 'all', img: './img/weapon-dice.svg', is_rng: true, desc: "Sorte: 6 = Mata todos, 1 = Cura todos. Rola a cada 5s." },
+    heart: { name: "Coração", cost: 1500, rng: 0, dmg: 0, rate: 0, type: 'none', img: './img/weapon-heart-on-fire.svg', is_eco: true, desc: "Queima 1 vida por onda para DOBRAR o dinheiro ganho." },
+    lollipop: { name: "Pirulito", cost: 400, rng: 2.5, dmg: 0, rate: 0, type: 'all', img: './img/weapon-lollipop.svg', is_aura: true, slow: 0.9, desc: "Caramelo grudento: Desacelera inimigos em 90%." },
+    pacman: { name: "Pacman", cost: 300, rng: 0.5, dmg: 99999, rate: 0, type: 'ground', img: './img/weapon-pacmam.svg', is_trap: true, start_lvl: 10, desc: "Come inimigos e perde 1 nível. Some no nível 0." },
+    powerup: { name: "Powerup", cost: 1000, rng: 99, dmg: 0, rate: 0, type: 'none', img: './img/weapon-powerup.svg', is_buff: true, buff_type: 'cannon', desc: "Buff Global: Aumenta dano de TODOS os Canhões em 10% por nível." },
+    promoted: { name: "Promoted", cost: 600, rng: 1.5, dmg: 0, rate: 0, type: 'none', img: './img/weapon-promoted.svg', is_buff: true, buff_type: 'neighbor', desc: "Evolui a torre abaixo a cada onda. Some se acabar o dinheiro." }
 };
 
 // Preload Images
@@ -1123,11 +1123,13 @@ function update_logic() {
 
 function apply_wave_end_effects() {
     state.towers.forEach(t => {
-        // HEART: Regenerate Life
+        // HEART: Burn Life, Double Money
         if (t.type === 'heart') {
-            if (state.lives < 50) {
-                state.lives++;
+            if (state.lives > 0) {
+                state.lives--;
+                state.money *= 2;
                 create_explosion(t.gx, t.gy, 1, '#f43f5e'); // Effect
+                if (state.lives <= 0) game_over();
             }
         }
 
