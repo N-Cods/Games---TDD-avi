@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { HashRouter as Router, Routes, Route } from 'react-router-dom'
 import Hub from './apps/Hub/Hub'
-import ABCApp from './apps/ABC/ABC'
+import ABCApp from './apps/Games/ABC/ABC'
 import TicTacToe from './apps/Games/TicTacToe/TicTacToe'
 import WaterSort from './apps/Games/WaterSort/WaterSort'
 import Match3 from './apps/Games/Match3/Match3'
