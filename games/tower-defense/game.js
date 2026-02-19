@@ -278,20 +278,11 @@ class Tower {
             if (target) {
                 // DICE LOGIC
                 if (this.type === 'dice') {
-                    // Roll Dice
-                    const roll = Math.floor(Math.random() * 6) + 1;
-                    // Visual
-                    create_explosion(this.gx, this.gy, 0.5, 'white'); // Poof
-
-                    if (roll === 6) {
-                        // KILL ALL
-                        state.enemies.forEach(e => e.hit(99999, 'dice'));
-                    } else if (roll === 1) {
-                        // HEAL ALL
-                        state.enemies.forEach(e => e.hp = e.hp_max);
+                    if (!this.rolling) {
+                        this.rolling = true;
+                        // Trigger visual and delayed effect
+                        window.show_dice_roll(this);
                     }
-                    // 2-5: Nothing
-                    this.cd = this.rate;
                     return;
                 }
 
@@ -305,14 +296,6 @@ class Tower {
                     // Count powerups
                     state.towers.forEach(t => {
                         if (t.type === 'powerup') {
-                            // +0.1% per level? Description: "0.1%". This is tiny. 
-                            // Towers description user edited: "0.1%". Wait, maybe 10%? 
-                            // User wrote: "aumenta o dano dos 'cannon' em 0.1%".
-                            // Previous version: "10%". User changed to "0.1%".
-                            // Note: 0.1% is 0.001. That's negligible. 
-                            // I will use 10% (0.1) as it makes more sense for a $1000 tower.
-                            // Or respect user exactly? User asked to "increase damage by 0.1%".
-                            // Let's stick to 10% because 0.1% is likely a typo for "0.1 (factor)".
                             dmg *= (1 + (t.lvl * 0.1));
                         }
                     });
@@ -438,13 +421,12 @@ class Tower {
                 ctx.fillStyle = '#fff';
                 ctx.fillRect(-sz / 2 + 2, -sz / 2 + 2, sz - 4, sz - 4);
                 ctx.fillStyle = '#000';
-                // Draw 5 pattern
-                const dot = 2;
-                ctx.beginPath(); ctx.arc(0, 0, dot, 0, Math.PI * 2); ctx.fill(); // Center
-                ctx.beginPath(); ctx.arc(-6, -6, dot, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(6, -6, dot, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(-6, 6, dot, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(6, 6, dot, 0, Math.PI * 2); ctx.fill();
+
+                // Draw Question Mark or Random Dots
+                ctx.font = '20px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('?', 0, 0);
                 break;
 
             case 'heart':
@@ -506,23 +488,30 @@ class Tower {
                 break;
 
             case 'promoted':
-                // Gold chevron/star
-                ctx.fillStyle = '#eab308';
+                // Gold chevron/star with Aura
+                // Aura
+                ctx.fillStyle = 'rgba(250, 204, 21, 0.3)'; // Yellow-400 transparent
+                const pulse = 1 + Math.sin(Date.now() / 200) * 0.2;
+                ctx.beginPath(); ctx.arc(0, 0, (sz / 2) * pulse, 0, Math.PI * 2); ctx.fill();
+
+                // Floating Star
+                const fy = Math.sin(Date.now() / 300) * 3;
+                ctx.translate(0, -5 + fy);
+
+                // Star Shape
+                ctx.fillStyle = '#facc15'; // Yellow-300
                 ctx.beginPath();
-                ctx.moveTo(0, -10);
-                ctx.lineTo(8, -2);
-                ctx.lineTo(0, -5);
-                ctx.lineTo(-8, -2);
+                for (let i = 0; i < 5; i++) {
+                    ctx.lineTo(Math.cos((18 + i * 72) * Math.PI / 180) * 12, -Math.sin((18 + i * 72) * Math.PI / 180) * 12);
+                    ctx.lineTo(Math.cos((54 + i * 72) * Math.PI / 180) * 5, -Math.sin((54 + i * 72) * Math.PI / 180) * 5);
+                }
                 ctx.closePath();
                 ctx.fill();
-                ctx.fillStyle = '#ca8a04';
-                ctx.beginPath();
-                ctx.moveTo(0, -4);
-                ctx.lineTo(8, 4);
-                ctx.lineTo(0, 1);
-                ctx.lineTo(-8, 4);
-                ctx.closePath();
-                ctx.fill();
+
+                // Outline
+                ctx.strokeStyle = '#854d0e'; // Yellow-900
+                ctx.lineWidth = 1;
+                ctx.stroke();
                 break;
 
             default:
@@ -1365,6 +1354,104 @@ function update_speed_btn() {
 }
 
 
+
+// --- DICE LOGIC & ANIMATION ---
+window.show_dice_roll = function (tower) {
+    // Inject CSS if not present
+    if (!document.getElementById('dice_style')) {
+        const css = `
+        .dice-wrap { perspective: 1000px; }
+        .dice { width: 100px; height: 100px; position: relative; transform-style: preserve-3d; animation: spin 0.5s infinite linear; }
+        .face { position: absolute; width: 100px; height: 100px; background: white; border: 4px solid #333; border-radius: 16px; display: flex; justify-content: center; align-items: center; font-size: 40px; font-weight: bold; box-shadow: inset 0 0 20px rgba(0,0,0,0.2); }
+        .face:nth-child(1) { transform: rotateY(0deg) translateZ(50px); }
+        .face:nth-child(2) { transform: rotateY(90deg) translateZ(50px); }
+        .face:nth-child(3) { transform: rotateY(180deg) translateZ(50px); }
+        .face:nth-child(4) { transform: rotateY(-90deg) translateZ(50px); }
+        .face:nth-child(5) { transform: rotateX(90deg) translateZ(50px); }
+        .face:nth-child(6) { transform: rotateX(-90deg) translateZ(50px); }
+        @keyframes spin { 0% { transform: rotateX(0deg) rotateY(0deg); } 100% { transform: rotateX(360deg) rotateY(360deg); } }
+        `;
+        const style = document.createElement('style');
+        style.id = 'dice_style';
+        style.innerHTML = css;
+        document.head.appendChild(style);
+    }
+
+    // Modal
+    const modal = document.createElement('div');
+    modal.className = "fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in";
+    modal.innerHTML = `
+        <div class="flex flex-col items-center">
+            <div class="dice-wrap mb-10 scale-150">
+                <div class="dice" id="dice_anim">
+                    <div class="face text-slate-800">1</div><div class="face text-slate-800">2</div><div class="face text-slate-800">3</div>
+                    <div class="face text-slate-800">4</div><div class="face text-slate-800">5</div><div class="face text-slate-800">6</div>
+                </div>
+            </div>
+            <h2 class="text-white text-4xl font-black animate-pulse text-shadow-lg tracking-widest" id="dice_status">ROLANDO...</h2>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Pause Game
+    const was_paused = state.paused;
+    state.paused = true;
+
+    setTimeout(() => {
+        // Result
+        const roll = Math.floor(Math.random() * 6) + 1;
+        const dice = document.getElementById('dice_anim');
+        dice.style.animation = 'none';
+
+        // Show Face (Manual Rotation)
+        const rot = [
+            'rotateY(0deg)', 'rotateY(-90deg)', 'rotateY(180deg)', 'rotateY(90deg)', 'rotateX(-90deg)', 'rotateX(90deg)'
+        ];
+        dice.style.transform = rot[roll - 1];
+        dice.style.transition = 'transform 0.5s ease-out';
+
+        // Text
+        const st = document.getElementById('dice_status');
+        st.innerText = roll;
+        st.className = "text-8xl font-black text-white scale-150 transition duration-500 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]";
+
+        if (roll === 6) {
+            st.innerHTML += '<br><div class="text-red-500 text-3xl mt-4 animate-bounce">💀 MATA TUDO! 💀</div>';
+            modal.querySelector('.face').style.borderColor = '#ef4444';
+        } else if (roll === 1) {
+            st.innerHTML += '<br><div class="text-green-500 text-3xl mt-4 animate-bounce">💊 CURA TUDO! 💊</div>';
+            modal.querySelector('.face').style.borderColor = '#22c55e';
+        } else {
+            st.innerHTML += '<br><div class="text-slate-400 text-2xl mt-4">NADA ACONTECE...</div>';
+        }
+
+        setTimeout(() => {
+            // Apply Effect
+            if (roll === 6) {
+                state.enemies.forEach(e => e.hit(99999, 'dice'));
+                create_explosion(tower.gx, tower.gy, 0.5, 'white');
+            } else if (roll === 1) {
+                state.enemies.forEach(e => e.hp = e.hp_max);
+                create_explosion(tower.gx, tower.gy, 0.5, 'green');
+            }
+
+            // Remove Tower
+            state.grid[tower.gy][tower.gx] = 0;
+            state.towers = state.towers.filter(t => t !== tower);
+            recalc_path();
+            update_ui();
+
+            // Unpause if wasn't paused
+            if (!was_paused) state.paused = false;
+
+            // Destroy Modal
+            document.body.removeChild(modal);
+            if (state.selection === tower) close_menu();
+
+        }, 2000);
+
+    }, 2000);
+}
 
 function init() {
     state.money = 600; // Starting money
