@@ -49,19 +49,48 @@ let state = {
 
 const TOWERS = {
     wall: { name: "Parede", cost: 50, rng: 0, dmg: 0, rate: 0, type: 'ground', img: './img/weapon-wall.svg', desc: "Bloqueia a passagem dos inimigos terrestres. Essencial para criar labirintos." },
-    cannon: { name: "Canhão", cost: 50, rng: 2.0, dmg: 10, rate: 60, type: 'ground', img: './img/weapon-cannon.svg', upgrade_factor: 1.25, desc: "Dano básico. Bom custo-benefício para início de jogo." },
-    mg: { name: "Metralha", cost: 150, rng: 3.0, dmg: 100, rate: 6, type: 'ground', img: './img/weapon-machine-gun.svg', upgrade_factor: 1.25, desc: "Alta cadência de tiro. Derrete inimigos rápidos e fracos." },
-    sniper: { name: "Sniper", cost: 250, rng: 10.0, dmg: 99999, rate: 60, type: 'all', img: './img/weapon-sniper.svg', upgrade_factor: 1.25, desc: "Alcance infinito. Elimina alvos prioritários com um tiro." },
-    poison: { name: "Veneno", cost: 150, rng: 3.0, dmg: 0, rate: 0, type: 'all', img: './img/weapon-poison.svg', slow: 0.3, upgrade_factor: 1.25, is_aura: true, desc: "Aura tóxica que retarda (30%) inimigos na área. Upgrade aumenta efeito." },
-    aa: { name: "Anti-Aereo", cost: 300, rng: 5.0, dmg: 100, rate: 12, type: 'air', img: './img/weapon-anti-aereo.svg', upgrade_factor: 1.25, desc: "Defesa vital contra ameaças aéreas. Dano alto vs Voo." },
-    mine: { name: "Mina", cost: 500, rng: 1.5, dmg: 99999, rate: 0, type: 'ground', img: './img/weapon-mine.svg', is_trap: true, single_use: true, upgrade_factor: 1.25, desc: "Explode ao contato. Dano massivo em área." },
-    bazooka: { name: "Bazooka", cost: 500, rng: 4.0, dmg: 100, rate: 60, type: 'all', img: './img/weapon-bazooka.svg', aoe: 1.5, upgrade_factor: 1.25, desc: "Dispara foguetes com grande área de explosão." },
+
+    cannon: {
+        name: "Canhão", cost: 50, rng: 2.0, dmg: 10, rate: 60, type: 'ground', img: './img/weapon-cannon.svg',
+        upg_dmg: 1.3, upg_rng: 1.05, upg_rate: 0.9,
+        desc: "Dano equilibrado. Melhora muito o dano com upgrades."
+    },
+    mg: {
+        name: "Metralha", cost: 150, rng: 3.0, dmg: 100, rate: 6, type: 'ground', img: './img/weapon-machine-gun.svg',
+        upg_dmg: 1.15, upg_rng: 1.0, upg_rate: 0.85,
+        desc: "Alta cadência de tiro. Derrete inimigos rápidos e fracos."
+    },
+    sniper: {
+        name: "Sniper", cost: 250, rng: 10.0, dmg: 99999, rate: 60, type: 'all', img: './img/weapon-sniper.svg',
+        upg_dmg: 1.5, upg_rng: 1.2, upg_rate: 0.95,
+        desc: "Alcance infinito. Elimina alvos prioritários com um tiro."
+    },
+    poison: {
+        name: "Veneno", cost: 150, rng: 3.0, dmg: 0, rate: 0, type: 'all', img: './img/weapon-poison.svg',
+        upg_dmg: 1.0, upg_rng: 1.15, upg_rate: 1.0, is_aura: true, slow: 0.3,
+        desc: "Aura tóxica que retarda (30%) inimigos na área. Upgrade aumenta efeito e área."
+    },
+    aa: {
+        name: "Anti-Aereo", cost: 300, rng: 5.0, dmg: 100, rate: 12, type: 'air', img: './img/weapon-anti-aereo.svg',
+        upg_dmg: 1.25, upg_rng: 1.1, upg_rate: 0.9,
+        desc: "Defesa vital contra ameaças aéreas. Dano alto vs Voo."
+    },
+    mine: {
+        name: "Mina", cost: 500, rng: 1.5, dmg: 99999, rate: 0, type: 'ground', img: './img/weapon-mine.svg',
+        upg_dmg: 1.2, upg_rng: 1.1, upg_rate: 1.0, is_trap: true, single_use: true,
+        desc: "Explode ao contato. Dano massivo em área."
+    },
+    bazooka: {
+        name: "Bazooka", cost: 500, rng: 4.0, dmg: 100, rate: 60, type: 'all', img: './img/weapon-bazooka.svg',
+        upg_dmg: 1.25, upg_rng: 1.1, upg_rate: 0.9, aoe: 1.5,
+        desc: "Dispara foguetes com grande área de explosão."
+    },
 
     // NEW TOWERS
     bowling: { name: "Boliche", cost: 10, rng: 0, dmg: 99999, rate: 0, type: 'ground', img: './img/weapon-bowling.svg', is_projectile: true, desc: "Atravessa o mapa eliminando tudo no caminho (inimigos e torres). Bloqueada por Paredes." },
     dice: { name: "Dado", cost: 400, rng: 5.0, dmg: 0, rate: 300, type: 'all', img: './img/weapon-dice.svg', is_rng: true, desc: "Sorte: 6 = Mata todos, 1 = Cura todos. Rola a cada 5s." },
     heart: { name: "Coração", cost: 1500, rng: 0, dmg: 0, rate: 0, type: 'none', img: './img/weapon-heart-on-fire.svg', is_eco: true, desc: "Queima 1 vida por onda para DOBRAR o dinheiro ganho." },
-    lollipop: { name: "Pirulito", cost: 400, rng: 2.5, dmg: 0, rate: 0, type: 'all', img: './img/weapon-lollipop.svg', is_aura: true, slow: 0.9, desc: "Caramelo grudento: Desacelera inimigos em 90%." },
+    lollipop: { name: "Pirulito", cost: 400, rng: 2.5, dmg: 0, rate: 0, type: 'all', img: './img/weapon-lollipop.svg', is_aura: true, slow: 0.9, upg_rng: 1.1, desc: "Caramelo grudento: Desacelera inimigos em 90%." },
     pacman: { name: "Pacman", cost: 300, rng: 0.5, dmg: 99999, rate: 0, type: 'ground', img: './img/weapon-pacmam.svg', is_trap: true, start_lvl: 10, desc: "Come inimigos e perde 1 nível. Some no nível 0." },
     powerup: { name: "Powerup", cost: 1000, rng: 99, dmg: 0, rate: 0, type: 'none', img: './img/weapon-powerup.svg', is_buff: true, buff_type: 'cannon', upgrade_factor: 1.1, desc: "Buff Global: Aumenta dano de TODOS os Canhões em 10% por nível." },
     promoted: { name: "Promoted", cost: 600, rng: 1.5, dmg: 0, rate: 0, type: 'none', img: './img/weapon-promoted.svg', is_buff: true, buff_type: 'neighbor', desc: "Evolui a torre abaixo a cada onda. Some se acabar o dinheiro." }
@@ -162,8 +191,22 @@ class Tower {
     }
     upgrade() {
         this.lvl++;
-        const factor = TOWERS[this.type].upgrade_factor || 1.25;
-        this.dmg *= factor;
+        const d = TOWERS[this.type];
+
+        // Damage (Increase)
+        const f_dmg = d.upg_dmg || 1.25;
+        this.dmg *= f_dmg;
+
+        // Range (Increase)
+        const f_rng = d.upg_rng || 1.0;
+        this.range *= f_rng;
+
+        // Rate (Cooldown Decrease) - Limit to 1 frame min
+        const f_rate = d.upg_rate || 1.0;
+        if (this.rate > 0) {
+            this.rate *= f_rate;
+            if (this.rate < 2) this.rate = 2; // Cap max speed
+        }
     }
     update() {
         // --- POWERUP LOGIC (Passive Buff) ---
