@@ -1485,208 +1485,25 @@ window.show_dice_roll = function (tower) {
 
 // --- LONG PRESS DETAIL LOGIC ---
 
-function setup_long_press() {
-    const btns = document.querySelectorAll('.tower_btn');
-    btns.forEach(btn => {
-        // Extract type from onclick="select_tower('xyz')"
-        const onClickStr = btn.getAttribute('onclick');
-        if (!onClickStr) return;
-
-        let type = onClickStr.match(/'([^']+)'/)[1];
-        if (!type) return;
-
-        // Remove inline onclick to handle it manually
-        btn.removeAttribute('onclick');
-
-        let pressTimer;
-        let isLongPress = false;
-
-        const start = (e) => {
-            isLongPress = false;
-            pressTimer = setTimeout(() => {
-                isLongPress = true;
-                show_tower_detail(type);
-                if (navigator.vibrate) navigator.vibrate(50);
-            }, 500); // 500ms Long Press
-        };
-
-        const cancel = () => {
-            clearTimeout(pressTimer);
-        };
-
-        // Handle Click (Selection)
-        btn.onclick = (e) => {
-            if (isLongPress) {
-                // Handled by timer, do nothing
-                isLongPress = false;
-                return;
-            }
-            select_tower(type);
-        };
-
-        // Touch/Mouse Events
-        btn.addEventListener('mousedown', start);
-        btn.addEventListener('touchstart', start, { passive: true });
-
-        btn.addEventListener('mouseup', cancel);
-        btn.addEventListener('mouseleave', cancel);
-        btn.addEventListener('touchend', cancel);
-        btn.addEventListener('touchcancel', cancel);
-    });
-}
-
-function show_tower_detail(type) {
-    const modal = document.getElementById('tower_detail_modal');
-    const t = TOWERS[type];
-    if (!t) return;
-
-    // Populate
-    document.getElementById('detail_img').src = t.img;
-    document.getElementById('detail_name').innerText = t.name;
-    document.getElementById('detail_type').innerText = t.type.toUpperCase();
-    document.getElementById('detail_desc').textContent = t.desc; // Use textContent for safety
-
-    document.getElementById('detail_cost').innerText = '$' + t.cost;
-    document.getElementById('detail_dmg').innerText = (t.dmg > 1000 ? (t.dmg / 1000).toFixed(1) + 'k' : t.dmg);
-    document.getElementById('detail_rng').innerText = (t.rng || '-');
-    document.getElementById('detail_rate').innerText = (t.rate || '-');
-
-    modal.classList.remove('hidden');
-}
-
-window.close_tower_detail = function () {
-    document.getElementById('tower_detail_modal').classList.add('hidden');
-}
-
-function init() {
-    state.money = 600; // Starting money
-    state.lives = 20;
-    state.wave = 1;
-    state.active = false;
-    state.game_over = false;
-    state.auto_wave = false;
-    state.grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
-    state.towers = [];
-    state.enemies = [];
-    state.projectiles = [];
-    state.particles = [];
-
-    // Initial Path
-    recalc_path();
-
-    // UI Updates
-    document.getElementById('game_over').classList.add('hidden');
-
-    // Start loop
-    game_loop();
-    update_ui();
-
-    // Setup Long Press Details
-    if (window.setup_long_press) setup_long_press();
-}
-
-// SETUP LONG PRESS
-setup_long_press();
-}
-state.game_over = false;
-state.spawning = false;
-state.speed = 1;
-state.grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
-state.towers = [];
-state.enemies = [];
-state.projectiles = [];
-state.particles = [];
-state.balls = [];
-
-// INHERITANCE LOGIC (Using Modal)
-const inheritance = parseFloat(localStorage.getItem('td_inheritance'));
-if (inheritance && inheritance > 0) {
-    const bonus = Math.floor(inheritance);
-    state.money += bonus;
-
-    // Show Inheritance Modal
-    const modal = document.getElementById('modal_inheritance');
-    document.getElementById('inheritance_val').innerText = `+$${bonus}`;
-    modal.classList.remove('hidden');
-
-    localStorage.removeItem('td_inheritance');
-}
-
-state.auto_wave = document.getElementById('auto_wave').checked;
-update_speed_btn();
-
-resize();
-recalc_path();
-update_ui();
-document.getElementById('game_over').classList.add('hidden');
-}
-
-// --- GAME OVER LOGIC ---
-
-// --- GAME OVER LOGIC ---
-
-function game_over() {
-    if (state.game_over) return;
-    state.game_over = true;
-    state.active = false;
-    state.spawning = false;
-
-    // SAVE INHERITANCE
-    // Formula: Money * (100 - Wave) / 200
-    // If Wave >= 100, Inheritance is <= 0 -> "Deserdado"
-    const inheritance = state.money * ((100 - state.wave) / 200.0);
-
-    const el_inh = document.getElementById('final_inheritance');
-
-    if (inheritance > 0) {
-        localStorage.setItem('td_inheritance', inheritance);
-        el_inh.innerText = `+$${Math.floor(inheritance)}`;
-        el_inh.classList.remove('text-red-500');
-        el_inh.classList.add('text-yellow-400');
-    } else {
-        localStorage.removeItem('td_inheritance');
-        el_inh.innerText = "DESERDADO";
-        el_inh.classList.remove('text-yellow-400');
-        el_inh.classList.add('text-red-500');
-    }
-
-    // Populate Results
-    document.getElementById('final_wave').innerText = state.wave;
-    document.getElementById('final_money').innerText = `$${Math.floor(state.money)}`;
-    document.getElementById('final_inheritance').innerText = `+$${Math.floor(inheritance)}`;
-
-    // Show Game Over Screen (No High Scores)
-    document.getElementById('game_over').classList.remove('hidden');
-}
-
-window.restart_game = function () {
-    document.getElementById('game_over').classList.add('hidden');
-    document.getElementById('auto_wave').checked = false;
-    init();
-}
-
-window.toggle_pause = function () { state.paused = !state.paused; }
-
-init();
-game_loop();
-// --- LONG PRESS DETAIL LOGIC ---
-
 window.setup_long_press = function () {
     const btns = document.querySelectorAll('.tower_btn');
     btns.forEach(btn => {
-        const onClickStr = btn.getAttribute('onclick');
+        // Try to get type from data-type or previous onclick
         let type = btn.dataset.type;
+        const onClickStr = btn.getAttribute('onclick');
 
         if (!type && onClickStr) {
             const match = onClickStr.match(/'([^']+)'/);
             if (match) type = match[1];
         }
+
         if (!type) return;
 
+        // Set data-type for future reference and remove inline onclick
         btn.dataset.type = type;
         btn.removeAttribute('onclick');
 
-        // Clone to clear old events
+        // Clone to clear old listeners if any
         const newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
 
@@ -1705,13 +1522,17 @@ window.setup_long_press = function () {
 
         const cancel = () => { clearTimeout(pressTimer); };
 
+        // Touch/Mouse Start
         newBtn.addEventListener('mousedown', (e) => { start(e); newBtn.style.transform = 'scale(0.95)'; });
         newBtn.addEventListener('touchstart', (e) => { start(e); newBtn.style.transform = 'scale(0.95)'; }, { passive: true });
 
+        // Touch/Mouse End/Cancel
         newBtn.addEventListener('mouseup', () => { cancel(); newBtn.style.transform = 'scale(1)'; });
         newBtn.addEventListener('mouseleave', () => { cancel(); newBtn.style.transform = 'scale(1)'; });
         newBtn.addEventListener('touchend', () => { cancel(); newBtn.style.transform = 'scale(1)'; });
+        newBtn.addEventListener('touchcancel', () => { cancel(); newBtn.style.transform = 'scale(1)'; });
 
+        // Click (Selection)
         newBtn.onclick = (e) => {
             if (isLongPress) {
                 e.preventDefault();
@@ -1729,17 +1550,134 @@ window.show_tower_detail = function (type) {
     const t = TOWERS[type];
     if (!t) return;
 
-    document.getElementById('detail_img').src = t.img;
-    document.getElementById('detail_name').innerText = t.name;
+    // Populate
+    const img = document.getElementById('detail_img');
+    if (img) img.src = t.img;
+
+    const elName = document.getElementById('detail_name');
+    if (elName) elName.innerText = t.name;
+
     document.getElementById('detail_type').innerText = t.type.toUpperCase();
     document.getElementById('detail_desc').textContent = t.desc;
 
     document.getElementById('detail_cost').innerText = '$' + t.cost;
-    document.getElementById('detail_dmg').innerText = (t.dmg > 1000 ? (t.dmg / 1000).toFixed(1) + 'k' : t.dmg);
-    document.getElementById('detail_rng').innerText = (t.rng || '-');
+    document.getElementById('detail_dmg').innerText = (t.dmg > 1000 ? (t.dmg / 1000).toFixed(1) + 'k' : (t.dmg || '-'));
+
+    const rng = t.range || t.rng || '-';
+    document.getElementById('detail_rng').innerText = typeof rng === 'number' ? rng.toFixed(1) : rng;
+
     document.getElementById('detail_rate').innerText = (t.rate || '-');
 
     modal.classList.remove('hidden');
+}
+
+window.close_tower_detail = function () {
+    const m = document.getElementById('tower_detail_modal');
+    if (m) m.classList.add('hidden');
+}
+
+// --- INIT & GAME OVER ---
+
+function game_over() {
+    if (state.game_over) return;
+    state.game_over = true;
+    state.active = false;
+    state.spawning = false;
+
+    // INHERITANCE LOGIC
+    const inheritance = state.money * ((100 - state.wave) / 200.0);
+    const el_inh = document.getElementById('final_inheritance');
+
+    if (inheritance > 0) {
+        localStorage.setItem('td_inheritance', inheritance);
+        el_inh.innerText = `+$${Math.floor(inheritance)}`;
+        el_inh.classList.remove('text-red-500');
+        el_inh.classList.add('text-yellow-400');
+    } else {
+        localStorage.removeItem('td_inheritance');
+        el_inh.innerText = "DESERDADO";
+        el_inh.classList.remove('text-yellow-400');
+        el_inh.classList.add('text-red-500');
+    }
+
+    // Populate Results
+    document.getElementById('final_wave').innerText = state.wave;
+    document.getElementById('final_money').innerText = `$${Math.floor(state.money)}`;
+
+    // Show Game Over Screen
+    document.getElementById('game_over').classList.remove('hidden');
+}
+
+window.restart_game = function () {
+    document.getElementById('game_over').classList.add('hidden');
+    document.getElementById('auto_wave').checked = false;
+    init();
+}
+
+window.toggle_pause = function () { state.paused = !state.paused; }
+
+function init() {
+    // State Reset
+    state.money = 600;
+    state.lives = 20;
+    state.wave = 1;
+    state.active = false;
+    state.game_over = false;
+    state.spawning = false;
+    state.speed = 1;
+    state.paused = false;
+
+    // Grid & Entities
+    state.grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+    state.towers = [];
+    state.enemies = [];
+    state.projectiles = [];
+    state.particles = [];
+    state.balls = [];
+
+    // Inheritance Apply
+    const inheritance = parseFloat(localStorage.getItem('td_inheritance'));
+    if (inheritance && inheritance > 0) {
+        const bonus = Math.floor(inheritance);
+        state.money += bonus;
+
+        // Show Inheritance Modal
+        const modal = document.getElementById('modal_inheritance');
+        if (modal) {
+            document.getElementById('inheritance_val').innerText = `+$${bonus}`;
+            modal.classList.remove('hidden');
+        }
+        localStorage.removeItem('td_inheritance');
+    }
+
+    // UI Reset
+    state.auto_wave = document.getElementById('auto_wave').checked;
+    update_speed_btn();
+    document.getElementById('game_over').classList.add('hidden');
+
+    resize();
+    recalc_path();
+    update_ui();
+
+    // Setup Interaction
+    if (window.setup_long_press) setup_long_press();
+}
+
+// Start
+init();
+game_loop();
+
+document.getElementById('detail_img').src = t.img;
+document.getElementById('detail_name').innerText = t.name;
+document.getElementById('detail_type').innerText = t.type.toUpperCase();
+document.getElementById('detail_desc').textContent = t.desc;
+
+document.getElementById('detail_cost').innerText = '$' + t.cost;
+document.getElementById('detail_dmg').innerText = (t.dmg > 1000 ? (t.dmg / 1000).toFixed(1) + 'k' : t.dmg);
+document.getElementById('detail_rng').innerText = (t.rng || '-');
+document.getElementById('detail_rate').innerText = (t.rate || '-');
+
+modal.classList.remove('hidden');
 }
 
 window.close_tower_detail = function () {
