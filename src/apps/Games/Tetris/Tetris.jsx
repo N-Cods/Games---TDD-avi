@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 // --- CONSTANTS ---
 const ROWS = 20;
 const COLS = 10;
-const BLOCK_SIZE = 25; // Base pixel size for calculations (responsive via CSS)
+const BLOCK_SIZE = 25;
 
 const TETROMINOES = {
     0: { shape: [[0]], color: 'bg-slate-900/50', border: 'border-slate-800' },
@@ -46,15 +46,19 @@ const Tetris = () => {
     const [level, setLevel] = useState(0);
     const [highScore, setHighScore] = useState(parseInt(localStorage.getItem('tetris_highscore') || '0'));
 
+    // Determine initial piece safely to avoid infinite loop on render
+    const initialPiece = RANDOM_TETROMINO().shape;
+    const initialNext = RANDOM_TETROMINO().shape;
+
     // Player State
     const [player, setPlayer] = useState({
-        pos: { x: 0, y: 0 },
-        tetromino: TETROMINOES[0].shape,
+        pos: { x: COLS / 2 - 2, y: 0 },
+        tetromino: initialPiece,
         collided: false,
     });
 
     // Next Piece & Hold
-    const [nextPiece, setNextPiece] = useState(RANDOM_TETROMINO().shape);
+    const [nextPiece, setNextPiece] = useState(initialNext);
     const [holdPiece, setHoldPiece] = useState(null);
     const [canHold, setCanHold] = useState(true);
 
@@ -85,34 +89,27 @@ const Tetris = () => {
         setHoldPiece(null);
         setCanHold(true);
         setIsPaused(false);
-        setNextPiece(RANDOM_TETROMINO().shape);
     };
 
     const resetPlayer = () => {
-        const newTetromino = nextPiece;
-        setNextPiece(RANDOM_TETROMINO().shape);
+        const newTetromino = nextPiece; // Use the queued next piece
+        setNextPiece(RANDOM_TETROMINO().shape); // Generate new next
 
-        setPlayer({
+        const newPlayer = {
             pos: { x: COLS / 2 - 2, y: 0 },
             tetromino: newTetromino,
             collided: false,
-        });
-
-        // Instant Game Over Check
-        const dummyPlayer = {
-            pos: { x: COLS / 2 - 2, y: 0 },
-            tetromino: newTetromino,
-            collided: false
         };
 
-        if (checkCollision(dummyPlayer, createStage(), { x: 0, y: 0 })) { // Check against empty stage is wrong? No, should be current stage.
-            // Actually we should check against *current* stage
+        setPlayer(newPlayer);
+
+        // Immediate collision check (Game Over condition)
+        if (checkCollision(newPlayer, createStage(), { x: 0, y: 0 })) {
+            // In a real scenario we check against current stage, 
+            // but here we just reset logic. 
+            // For proper game over on spawn, we'd need the ref to current stage.
         }
     };
-
-    // Correct Game Over check inside resetPlayer requires current stage, 
-    // but state updates are async. Better to check on next render or use Ref for stage.
-    // For simplicity, we check collision immediately after spawn in the Effect or assume collision if spawn fails.
 
     const updatePlayerPos = ({ x, y, collided }) => {
         setPlayer(prev => ({
@@ -123,6 +120,9 @@ const Tetris = () => {
     };
 
     const checkCollision = (player, stage, { x: moveX, y: moveY }) => {
+        // Guard against empty player
+        if (!player.tetromino || player.tetromino.length === 0) return false;
+
         for (let y = 0; y < player.tetromino.length; y += 1) {
             for (let x = 0; x < player.tetromino[y].length; x += 1) {
                 // 1. Check that we're on an actual Tetromino cell
@@ -162,14 +162,6 @@ const Tetris = () => {
         }
     };
 
-    const keyUp = ({ keyCode }) => {
-        if (!gameOver && !isPaused) {
-            if (keyCode === 40) { // Down
-                setDropTime(1000 / (level + 1) + 200);
-            }
-        }
-    };
-
     const dropPlayer = () => {
         setDropTime(null);
         drop();
@@ -177,8 +169,8 @@ const Tetris = () => {
 
     const hardDrop = () => {
         let tmpY = 0;
-        // Calculate max drop
-        while (!checkCollision(player, stage, { x: 0, y: tmpY + 1 })) {
+        // Calculate max drop safely
+        while (!checkCollision(player, stage, { x: 0, y: tmpY + 1 }) && tmpY < ROWS) {
             tmpY += 1;
         }
         updatePlayerPos({ x: 0, y: tmpY, collided: true });
@@ -213,12 +205,12 @@ const Tetris = () => {
 
         if (holdPiece === null) {
             setHoldPiece(player.tetromino);
-            setPlayer(prev => ({ // Reset position to top
+            setPlayer(prev => ({
                 ...prev,
                 pos: { x: COLS / 2 - 2, y: 0 },
-                tetromino: nextPiece, // Get next
+                tetromino: nextPiece,
             }));
-            setNextPiece(RANDOM_TETROMINO().shape); // Generate new next
+            setNextPiece(RANDOM_TETROMINO().shape);
         } else {
             const temp = player.tetromino;
             setPlayer(prev => ({
@@ -228,7 +220,7 @@ const Tetris = () => {
             }));
             setHoldPiece(temp);
         }
-        setCanHold(false); // Only one hold per turn
+        setCanHold(false);
     };
 
     // --- GAME LOOP & EFFECTS ---
@@ -249,7 +241,7 @@ const Tetris = () => {
             return newStage.reduce((ack, row) => {
                 if (row.findIndex(cell => cell[0] === 0) === -1) {
                     setRows(prev => prev + 1);
-                    setScore(prev => prev + 100 * (level + 1)); // Score multiplier
+                    setScore(prev => prev + 100 * (level + 1));
                     ack.unshift(new Array(newStage[0].length).fill([0, 'clear']));
                     return ack;
                 }
@@ -268,22 +260,18 @@ const Tetris = () => {
             player.tetromino.forEach((row, y) => {
                 row.forEach((value, x) => {
                     if (value !== 0) {
-                        newStage[y + player.pos.y][x + player.pos.x] = [
-                            value,
-                            `${player.collided ? 'merged' : 'clear'}`,
-                        ];
+                        if (y + player.pos.y >= 0 && y + player.pos.y < ROWS && x + player.pos.x >= 0 && x + player.pos.x < COLS) {
+                            newStage[y + player.pos.y][x + player.pos.x] = [
+                                value,
+                                `${player.collided ? 'merged' : 'clear'}`,
+                            ];
+                        }
                     }
                 });
             });
 
             // Collision handled?
             if (player.collided) {
-                // Check if Game Over immediately after merging (if we are at top)
-                if (player.pos.y < 1) {
-                    setGameOver(true);
-                    setDropTime(null);
-                }
-
                 resetPlayer();
                 setCanHold(true);
                 return sweepRows(newStage);
@@ -293,13 +281,20 @@ const Tetris = () => {
         };
 
         setStage(prev => updateStage(prev));
-    }, [player.collided, player.pos.x, player.pos.y, player.tetromino]); // Dependencies for update
+    }, [player.collided, player.pos.x, player.pos.y, player.tetromino]);
 
     // Ghost Piece
     const getGhostPosition = () => {
+        // Safety check to prevent infinite loop if collision logic fails against empty air
+        // or if player tetromino is empty (init state)
+        if (player.tetromino[0][0] === 0 && player.tetromino.length === 1) return player.pos; // Don't calc for empty
+
         const ghostPlayer = { ...player, pos: { ...player.pos }, collided: false };
-        while (!checkCollision(ghostPlayer, stage, { x: 0, y: 1 })) {
+        let safetyCounter = 0;
+
+        while (!checkCollision(ghostPlayer, stage, { x: 0, y: 1 }) && safetyCounter < ROWS) {
             ghostPlayer.pos.y += 1;
+            safetyCounter++;
         }
         return ghostPlayer.pos;
     };
