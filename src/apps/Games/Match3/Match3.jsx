@@ -1,136 +1,277 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, ArrowLeft, Candy } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ArrowLeft, RefreshCw, Zap, Hammer, Bomb, Crosshair, Star, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const WIDTH = 8;
-const CANDY_COLORS = ['bg-red-500', 'bg-yellow-400', 'bg-orange-500', 'bg-purple-500', 'bg-green-500', 'bg-blue-500'];
+const CANDY_TYPES = [
+    { color: 'text-red-500', bg: 'bg-red-500', icon: Heart },
+    { color: 'text-yellow-400', bg: 'bg-yellow-400', icon: Star },
+    { color: 'text-purple-500', bg: 'bg-purple-500', icon: Zap },
+    { color: 'text-green-500', bg: 'bg-green-500', icon: ({ className }) => <div className={`w-full h-full rounded-full border-4 border-current ${className}`} /> },
+    { color: 'text-blue-500', bg: 'bg-blue-500', icon: ({ className }) => <div className={`w-full h-full transform rotate-45 border-4 border-current ${className}`} /> },
+    { color: 'text-orange-500', bg: 'bg-orange-500', icon: ({ className }) => <div className={`w-full h-full border-4 border-current rounded-md ${className}`} /> },
+];
 
-export default function Match3() {
-    const [board, set_board] = useState([]);
-    const [dragged_candy, set_dragged_candy] = useState(null);
-    const [replaced_candy, set_replaced_candy] = useState(null);
-    const [score, set_score] = useState(0);
+const Match3 = () => {
+    const [board, setBoard] = useState([]);
+    const [draggedCandy, setDraggedCandy] = useState(null);
+    const [score, setScore] = useState(0);
+    const [activePowerup, setActivePowerup] = useState(null); // 'HAMMER', 'BOMB', 'LASER'
+    const [shake, setShake] = useState(false);
+    const [particles, setParticles] = useState([]);
 
-    const create_board = () => {
-        const random_board = [];
+    // Sound effects placeholders (using visual feedback for now)
+
+    // Create Board
+    const createBoard = () => {
+        const randomBoard = [];
         for (let i = 0; i < WIDTH * WIDTH; i++) {
-            const random_color = CANDY_COLORS[Math.floor(Math.random() * CANDY_COLORS.length)];
-            random_board.push(random_color);
+            const randomType = Math.floor(Math.random() * CANDY_TYPES.length);
+            randomBoard.push(randomType);
         }
-        set_board(random_board);
+        setBoard(randomBoard);
+        setScore(0);
     };
 
-    const check_for_matches = useCallback(() => {
-        let new_board = [...board];
-        let found_match = false;
+    // Check Matches
+    const checkForMatches = useCallback(() => {
+        let newBoard = [...board];
+        let foundMatch = false;
+        let matchScore = 0;
 
-        // Check Rows
+        // Rows
         for (let i = 0; i < 64; i++) {
-            const row_of_three = [i, i + 1, i + 2];
+            const rowOfThree = [i, i + 1, i + 2];
             const excluded = [6, 7, 14, 15, 22, 23, 30, 31, 38, 39, 46, 47, 54, 55, 62, 63];
             if (excluded.includes(i % 8)) continue;
-            if (row_of_three.every(square => new_board[square] === new_board[i] && new_board[i])) {
-                set_score(s => s + 3);
-                row_of_three.forEach(square => new_board[square] = '');
-                found_match = true;
+
+            if (rowOfThree.every(square => newBoard[square] === newBoard[i] && newBoard[i] !== null)) {
+                matchScore += 30;
+                rowOfThree.forEach(square => newBoard[square] = null);
+                foundMatch = true;
             }
         }
 
-        // Check Cols
+        // Cols
         for (let i = 0; i <= 47; i++) {
-            const col_of_three = [i, i + WIDTH, i + WIDTH * 2];
-            if (col_of_three.every(square => new_board[square] === new_board[i] && new_board[i])) {
-                set_score(s => s + 3);
-                col_of_three.forEach(square => new_board[square] = '');
-                found_match = true;
+            const colOfThree = [i, i + WIDTH, i + WIDTH * 2];
+            if (colOfThree.every(square => newBoard[square] === newBoard[i] && newBoard[i] !== null)) {
+                matchScore += 30;
+                colOfThree.forEach(square => newBoard[square] = null);
+                foundMatch = true;
             }
         }
 
-        if (found_match) set_board(new_board);
-        return found_match;
+        if (foundMatch) {
+            setBoard(newBoard);
+            setScore(prev => prev + matchScore);
+            triggerShake();
+        }
+        return foundMatch;
     }, [board]);
 
-    const move_into_square_below = useCallback(() => {
-        let new_board = [...board];
+    // Move Down
+    const moveIntoSquareBelow = useCallback(() => {
+        let newBoard = [...board];
         for (let i = 0; i <= 55; i++) {
-            const first_row = [0, 1, 2, 3, 4, 5, 6, 7];
-            const is_first_row = first_row.includes(i);
-            if (is_first_row && new_board[i] === '') {
-                new_board[i] = CANDY_COLORS[Math.floor(Math.random() * CANDY_COLORS.length)];
+            const firstRow = [0, 1, 2, 3, 4, 5, 6, 7];
+            const isFirstRow = firstRow.includes(i);
+
+            if (isFirstRow && newBoard[i] === null) {
+                newBoard[i] = Math.floor(Math.random() * CANDY_TYPES.length);
             }
-            if ((new_board[i + WIDTH] === '')) {
-                new_board[i + WIDTH] = new_board[i];
-                new_board[i] = '';
+
+            if (newBoard[i + WIDTH] === null) {
+                newBoard[i + WIDTH] = newBoard[i];
+                newBoard[i] = null;
             }
         }
-        set_board(new_board);
+        setBoard(newBoard);
     }, [board]);
 
-    // Mobile touch support simulation with clicks
-    const [clicked_id, set_clicked_id] = useState(null);
-    const handle_candy_click = (index) => {
-        if (clicked_id === null) {
-            set_clicked_id(index);
-        } else {
-            // Swap logic
-            const valid_moves = [clicked_id - 1, clicked_id - WIDTH, clicked_id + 1, clicked_id + WIDTH];
-            // Check boundaries for left/right moves
-            if (clicked_id % WIDTH === 0 && index === clicked_id - 1) return set_clicked_id(index);
-            if (clicked_id % WIDTH === WIDTH - 1 && index === clicked_id + 1) return set_clicked_id(index);
+    // Game Loop
+    useEffect(() => {
+        const timer = setInterval(() => {
+            checkForMatches();
+            moveIntoSquareBelow();
+        }, 100);
+        return () => clearInterval(timer);
+    }, [checkForMatches, moveIntoSquareBelow]);
 
-            if (valid_moves.includes(index)) {
-                const new_board = [...board];
-                const temp = new_board[clicked_id];
-                new_board[clicked_id] = new_board[index];
-                new_board[index] = temp;
-                set_board(new_board);
-                set_clicked_id(null);
+    useEffect(() => { createBoard(); }, []);
+
+    // Interaction
+    const handleCandyClick = (index) => {
+        if (activePowerup) {
+            usePowerup(index);
+            return;
+        }
+
+        if (draggedCandy === null) {
+            setDraggedCandy(index);
+        } else {
+            // Swap
+            const validMoves = [draggedCandy - 1, draggedCandy + 1, draggedCandy - WIDTH, draggedCandy + WIDTH];
+            const isLeftEdge = draggedCandy % WIDTH === 0;
+            const isRightEdge = draggedCandy % WIDTH === WIDTH - 1;
+
+            if ((isLeftEdge && index === draggedCandy - 1) || (isRightEdge && index === draggedCandy + 1)) {
+                setDraggedCandy(index);
+                return;
+            }
+
+            if (validMoves.includes(index)) {
+                const newBoard = [...board];
+                const temp = newBoard[draggedCandy];
+                newBoard[draggedCandy] = newBoard[index];
+                newBoard[index] = temp;
+                setBoard(newBoard);
+                setDraggedCandy(null);
             } else {
-                set_clicked_id(index);
+                setDraggedCandy(index);
             }
         }
     };
 
-    useEffect(() => { create_board(); }, []);
+    // Powerups
+    const usePowerup = (index) => {
+        let newBoard = [...board];
+        let cost = 0;
 
-    useEffect(() => {
-        const timer = setInterval(() => {
-            check_for_matches();
-            move_into_square_below();
-        }, 100);
-        return () => clearInterval(timer);
-    }, [check_for_matches, move_into_square_below]);
+        if (activePowerup === 'HAMMER') {
+            cost = 100;
+            if (score < cost) return alert("Pontos insuficientes! (100)");
+            newBoard[index] = null;
+        } else if (activePowerup === 'BOMB') {
+            cost = 250;
+            if (score < cost) return alert("Pontos insuficientes! (250)");
+            // Destroy 3x3
+            const row = Math.floor(index / WIDTH);
+            const col = index % WIDTH;
+            for (let r = row - 1; r <= row + 1; r++) {
+                for (let c = col - 1; c <= col + 1; c++) {
+                    if (r >= 0 && r < WIDTH && c >= 0 && c < WIDTH) {
+                        newBoard[r * WIDTH + c] = null;
+                    }
+                }
+            }
+        } else if (activePowerup === 'LASER') {
+            cost = 500;
+            if (score < cost) return alert("Pontos insuficientes! (500)");
+            // Destroy Row & Col
+            const row = Math.floor(index / WIDTH);
+            const col = index % WIDTH;
+            for (let i = 0; i < WIDTH; i++) {
+                newBoard[row * WIDTH + i] = null; // Row
+                newBoard[i * WIDTH + col] = null; // Col
+            }
+        }
+
+        setScore(s => s - cost);
+        setBoard(newBoard);
+        setActivePowerup(null);
+        triggerShake();
+    };
+
+    const triggerShake = () => {
+        setShake(true);
+        setTimeout(() => setShake(false), 300);
+    };
 
     return (
-        <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col items-center py-6 px-4 select-none">
-            <div className="flex justify-between w-full max-w-lg mb-4 items-center px-4">
-                <Link to="/" className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white"><ArrowLeft size={20} /></Link>
-                <div className="text-xl font-bold text-pink-500 bg-slate-800/50 px-4 py-1 rounded-full border border-pink-500/20">Score: {score}</div>
-                <button onClick={() => { set_score(0); create_board(); }} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white"><RefreshCw size={20} /></button>
+        <div className={`min-h-screen bg-slate-950 flex flex-col items-center justify-start pt-6 px-2 select-none overflow-hidden ${shake ? 'animate-shake' : ''}`}>
+
+            {/* Header */}
+            <div className="w-full max-w-md flex justify-between items-center mb-4 px-2">
+                <Link to="/" className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white border border-slate-700">
+                    <ArrowLeft size={20} />
+                </Link>
+                <div className="flex flex-col items-center">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Score</span>
+                    <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500 drop-shadow-sm">{score}</span>
+                </div>
+                <button onClick={createBoard} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white border border-slate-700">
+                    <RefreshCw size={20} />
+                </button>
             </div>
 
-            <div className="bg-slate-800 p-2 rounded-xl shadow-2xl border-4 border-slate-700">
-                <div className="grid grid-cols-8 gap-1 bg-slate-900 p-1 rounded-lg">
-                    {board.map((candy_color, index) => (
-                        <div
-                            key={index}
-                            data-id={index}
-                            onClick={() => handle_candy_click(index)}
-                            className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center cursor-pointer transition-all duration-200 ${clicked_id === index ? 'scale-90 ring-4 ring-white z-10 bg-slate-700 rounded-lg' : 'hover:brightness-110'}`}
-                        >
-                            {candy_color && (
-                                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full shadow-inner ${candy_color} border-2 border-white/20 flex items-center justify-center`}>
-                                    <div className="w-2 h-2 bg-white/40 rounded-full -mt-2 -ml-2 blur-[1px]"></div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
+            {/* Board */}
+            <div className="bg-slate-900/50 p-2 rounded-2xl border-4 border-slate-800 shadow-2xl backdrop-blur-sm mb-6">
+                <div className="grid grid-cols-8 gap-1 bg-slate-950/50 p-1 rounded-xl">
+                    {board.map((type, index) => {
+                        const CandyConfig = CANDY_TYPES[type];
+                        const Icon = CandyConfig?.icon;
+                        return (
+                            <div
+                                key={index}
+                                onClick={() => handleCandyClick(index)}
+                                className={`
+                                    w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center cursor-pointer transition-all duration-200 rounded-lg
+                                    ${draggedCandy === index ? 'bg-slate-700 scale-90 ring-4 ring-white z-10' : 'hover:bg-slate-800'}
+                                    ${activePowerup ? 'hover:ring-2 hover:ring-red-500' : ''}
+                                `}
+                            >
+                                {type !== null && CandyConfig && (
+                                    <div className={`${CandyConfig.color} drop-shadow-lg filter brightness-110 active:scale-90 transition-transform`}>
+                                        <Icon size={32} strokeWidth={2.5} className="animate-in zoom-in duration-300" />
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
-            <p className="mt-8 text-slate-400 text-sm bg-slate-800 px-4 py-2 rounded-full border border-slate-700">
-                Toque em dois doces adjacentes para trocar
-            </p>
+            {/* Powerups */}
+            <div className="w-full max-w-md px-4">
+                <div className="text-center text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold">Power-ups</div>
+                <div className="flex justify-center gap-4">
+                    <button
+                        onClick={() => setActivePowerup(activePowerup === 'HAMMER' ? null : 'HAMMER')}
+                        className={`group relative flex flex-col items-center gap-1 p-3 rounded-2xl border-b-4 transition-all active:border-b-0 active:translate-y-1 ${activePowerup === 'HAMMER' ? 'bg-yellow-600 border-yellow-800 text-white' : 'bg-slate-800 border-slate-950 text-slate-400 hover:bg-slate-700'}`}
+                    >
+                        <Hammer size={24} />
+                        <span className="text-[10px] font-bold">100 pts</span>
+                        <span className="absolute -top-2 -right-2 bg-yellow-500 text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">Martelo</span>
+                    </button>
+
+                    <button
+                        onClick={() => setActivePowerup(activePowerup === 'BOMB' ? null : 'BOMB')}
+                        className={`group relative flex flex-col items-center gap-1 p-3 rounded-2xl border-b-4 transition-all active:border-b-0 active:translate-y-1 ${activePowerup === 'BOMB' ? 'bg-orange-600 border-orange-800 text-white' : 'bg-slate-800 border-slate-950 text-slate-400 hover:bg-slate-700'}`}
+                    >
+                        <Bomb size={24} />
+                        <span className="text-[10px] font-bold">250 pts</span>
+                        <span className="absolute -top-2 -right-2 bg-orange-500 text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">Bomba</span>
+                    </button>
+
+                    <button
+                        onClick={() => setActivePowerup(activePowerup === 'LASER' ? null : 'LASER')}
+                        className={`group relative flex flex-col items-center gap-1 p-3 rounded-2xl border-b-4 transition-all active:border-b-0 active:translate-y-1 ${activePowerup === 'LASER' ? 'bg-purple-600 border-purple-800 text-white' : 'bg-slate-800 border-slate-950 text-slate-400 hover:bg-slate-700'}`}
+                    >
+                        <Crosshair size={24} />
+                        <span className="text-[10px] font-bold">500 pts</span>
+                        <span className="absolute -top-2 -right-2 bg-purple-500 text-slate-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full">Laser</span>
+                    </button>
+                </div>
+                {activePowerup && (
+                    <div className="mt-4 text-center animate-pulse text-yellow-400 font-bold text-sm bg-slate-900/80 py-2 rounded-lg border border-yellow-500/30">
+                        {activePowerup === 'HAMMER' && "Toque em um doce para destruir!"}
+                        {activePowerup === 'BOMB' && "Toque para explodir uma área 3x3!"}
+                        {activePowerup === 'LASER' && "Toque para destruir a linha e coluna!"}
+                    </div>
+                )}
+            </div>
+
+            <style>{`
+                @keyframes shake {
+                    0%, 100% { transform: translateX(0); }
+                    25% { transform: translateX(-5px); }
+                    75% { transform: translateX(5px); }
+                }
+                .animate-shake { animation: shake 0.2s ease-in-out; }
+            `}</style>
         </div>
     );
 };
+
+export default Match3;
