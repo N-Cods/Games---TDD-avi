@@ -4,10 +4,20 @@ import { Link } from 'react-router-dom';
 
 const TicTacToe = () => {
     const [board, setBoard] = useState(Array(9).fill(null));
-    const [isXNext, setIsXNext] = useState(true); // X is always Player
+    const [isXNext, setIsXNext] = useState(true);
     const [winner, setWinner] = useState(null);
-    const [mode, setMode] = useState('CPU'); // 'CPU' or 'PVP'
-    const [scores, setScores] = useState({ X: 0, O: 0, D: 0 });
+    const [mode, setMode] = useState('CPU');
+
+    // Initialize scores from LocalStorage
+    const [scores, setScores] = useState(() => {
+        const saved = localStorage.getItem('tictactoe_scores');
+        return saved ? JSON.parse(saved) : { X: 0, O: 0, D: 0 };
+    });
+
+    // Save scores to LocalStorage
+    useEffect(() => {
+        localStorage.setItem('tictactoe_scores', JSON.stringify(scores));
+    }, [scores]);
 
     const checkWinner = (squares) => {
         const lines = [
@@ -43,25 +53,21 @@ const TicTacToe = () => {
         }
     };
 
-    // CPU Logic
+    // CPU Logic (Unchanged but ensuring it respects new state)
     useEffect(() => {
         if (mode === 'CPU' && !isXNext && !winner) {
             const timer = setTimeout(() => {
                 const emptyIndices = board.map((v, i) => v === null ? i : null).filter(v => v !== null);
                 if (emptyIndices.length > 0) {
-                    // Simple AI: Pick random move for now (can upgrade later)
-                    // Priority: Block win, Take center
-
                     let move = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
 
-                    // Check if can win
+                    // Win Logic
                     for (let idx of emptyIndices) {
                         const temp = [...board]; temp[idx] = 'O';
                         if (checkWinner(temp) === 'O') { move = idx; break; }
                     }
-
-                    // Check if need block
-                    if (move === null || move === undefined) {
+                    // Block Logic
+                    if (move === null || move === undefined) { // Simplify check
                         for (let idx of emptyIndices) {
                             const temp = [...board]; temp[idx] = 'X';
                             if (checkWinner(temp) === 'X') { move = idx; break; }
@@ -94,73 +100,96 @@ const TicTacToe = () => {
         setIsXNext(true);
     };
 
+    const clearScores = () => {
+        if (confirm("Zerar o placar?")) {
+            setScores({ X: 0, O: 0, D: 0 });
+        }
+    };
+
     return (
-        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
-            <div className="w-full max-w-sm">
-                <div className="flex justify-between items-center mb-8">
-                    <Link to="/" className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white">
-                        <ArrowLeft size={24} />
-                    </Link>
-                    <h1 className="text-2xl font-bold text-white">Tic Tac Toe</h1>
-                    <button onClick={resetGame} className="p-2 bg-slate-800 rounded-full text-slate-400 hover:text-white">
-                        <RefreshCw size={24} />
-                    </button>
-                </div>
+        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-start pt-10 px-4">
 
-                <div className="flex justify-center mb-6 gap-2 bg-slate-800 p-1 rounded-xl">
-                    <button
-                        onClick={() => { setMode('CPU'); resetGame(); }}
-                        className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${mode === 'CPU' ? 'bg-cyan-600 text-white' : 'text-slate-400'}`}
-                    >
-                        <Bot size={16} /> vs CPU
-                    </button>
-                    <button
-                        onClick={() => { setMode('PVP'); resetGame(); }}
-                        className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${mode === 'PVP' ? 'bg-purple-600 text-white' : 'text-slate-400'}`}
-                    >
-                        <User size={16} /> vs Player
-                    </button>
-                </div>
+            {/* Header */}
+            <div className="w-full max-w-md flex justify-between items-center mb-8">
+                <Link to="/" className="p-3 bg-slate-900 rounded-full text-slate-400 hover:text-white border border-slate-800">
+                    <ArrowLeft size={24} />
+                </Link>
+                <h1 className="text-3xl font-black text-white tracking-tight uppercase">Tic Tac Toe</h1>
+                <button onClick={resetGame} className="p-3 bg-slate-900 rounded-full text-cyan-400 hover:text-white border border-slate-800 hover:bg-cyan-600 transition">
+                    <RefreshCw size={24} />
+                </button>
+            </div>
 
-                <div className="grid grid-cols-3 gap-2 mb-8 bg-slate-800 p-2 rounded-xl">
+            {/* Mode Selection */}
+            <div className="w-full max-w-md flex gap-2 mb-8 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                <button
+                    onClick={() => { setMode('CPU'); resetGame(); }}
+                    className={`flex-1 py-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition ${mode === 'CPU' ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    <Bot size={18} /> vs CPU
+                </button>
+                <button
+                    onClick={() => { setMode('PVP'); resetGame(); }}
+                    className={`flex-1 py-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition ${mode === 'PVP' ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    <User size={18} /> vs Player
+                </button>
+            </div>
+
+            {/* Game Board */}
+            <div className="w-full max-w-md aspect-square mb-8">
+                <div className="grid grid-cols-3 grid-rows-3 h-full w-full gap-0 border-4 border-slate-700 bg-slate-700 rounded-xl overflow-hidden">
                     {board.map((cell, i) => (
                         <button
                             key={i}
                             onClick={() => handleClick(i)}
                             className={`
-                                h-24 rounded-lg flex items-center justify-center text-4xl shadow-sm
-                                ${cell ? 'bg-slate-700' : 'bg-slate-750 hover:bg-slate-700'}
-                                ${cell === 'X' ? 'text-cyan-400' : 'text-purple-400'}
+                                flex items-center justify-center text-6xl font-black transition-all
+                                bg-slate-950 hover:bg-slate-900
+                                border border-slate-800
+                                ${cell === 'X' ? 'text-blue-500 scale-100' : ''}
+                                ${cell === 'O' ? 'text-red-500 scale-100' : ''}
+                                ${!cell && !winner ? 'cursor-pointer' : 'cursor-default'}
                             `}
                         >
-                            {cell === 'X' && <X size={48} strokeWidth={2.5} />}
-                            {cell === 'O' && <Circle size={40} strokeWidth={3} />}
+                            {cell === 'X' && <X size={64} strokeWidth={3} />}
+                            {cell === 'O' && <Circle size={56} strokeWidth={3} />}
                         </button>
                     ))}
                 </div>
+            </div>
 
-                {winner && (
-                    <div className="text-center animate-bounce mb-6">
-                        <span className="text-xl font-bold text-white bg-slate-800 px-6 py-2 rounded-full border border-slate-700">
-                            {winner === 'Draw' ? 'Empate!' : `Vencedor: ${winner}`}
-                        </span>
-                    </div>
-                )}
+            {/* Winner Announcement */}
+            {winner && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 animate-bounce">
+                    <span className="text-2xl font-black text-white bg-slate-900/90 px-8 py-4 rounded-2xl border-2 border-cyan-500 shadow-2xl backdrop-blur-sm whitespace-nowrap">
+                        {winner === 'Draw' ? 'EMPATE!' : `VENCEDOR: ${winner}!`}
+                    </span>
+                </div>
+            )}
 
-                <div className="flex justify-between text-sm font-mono text-slate-400 px-4">
-                    <div className="text-center">
-                        <span className="block text-2xl font-bold text-cyan-400">{scores.X}</span>
-                        <span>JOGADOR (X)</span>
+            {/* Scoreboard */}
+            <div className="w-full max-w-md bg-slate-900 rounded-2xl p-6 border border-slate-800">
+                <div className="flex justify-between items-center text-center">
+                    <div className="flex flex-col">
+                        <span className="text-xs font-bold text-blue-500 mb-1">JOGADOR (X)</span>
+                        <span className="text-4xl font-black text-white">{scores.X}</span>
                     </div>
-                    <div className="text-center">
-                        <span className="block text-2xl font-bold text-slate-500">{scores.D}</span>
-                        <span>EMPATES</span>
+                    <div className="flex flex-col px-4 border-x border-slate-800">
+                        <span className="text-xs font-bold text-slate-500 mb-1">EMPATES</span>
+                        <span className="text-2xl font-bold text-slate-400">{scores.D}</span>
                     </div>
-                    <div className="text-center">
-                        <span className="block text-2xl font-bold text-purple-400">{scores.O}</span>
-                        <span>{mode === 'CPU' ? 'CPU (O)' : 'P2 (O)'}</span>
+                    <div className="flex flex-col">
+                        <span className="text-xs font-bold text-red-500 mb-1">{mode === 'CPU' ? 'CPU (O)' : 'P2 (O)'}</span>
+                        <span className="text-4xl font-black text-white">{scores.O}</span>
                     </div>
                 </div>
+                <button
+                    onClick={clearScores}
+                    className="w-full mt-4 py-2 text-xs font-bold text-slate-600 hover:text-red-400 transition border-t border-slate-800 pt-4"
+                >
+                    LIMPAR PLACAR
+                </button>
             </div>
         </div>
     );
